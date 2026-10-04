@@ -87,7 +87,7 @@ export async function render(container, params, ctx) {
                         data-name="${esc(u.full_name)}"
                         data-active="${u.active}"
                         ${isSelf || !canManage ? 'disabled title="Status change disabled"' : ''}>
-                        ${u.active ? '🟢 Active' : '⚪ Disabled'}
+                        ${u.active ? 'Active' : 'Disabled'}
                       </button>
                     </td>
                     ${canManage ? `
@@ -133,7 +133,7 @@ export async function render(container, params, ctx) {
 
             try {
               btn.disabled = true;
-              await updateUser(userId, { active: newActive });
+              await updateUser(userId, { active: newActive }, ctx.profile.role);
               toast(`User "${userName}" set to ${newActive ? 'Active' : 'Disabled'}.`);
               await refresh();
             } catch (err) {
@@ -183,8 +183,8 @@ export async function render(container, params, ctx) {
     openModal({
       title: 'Create User Account',
       contentHtml: `
-        <div class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded text-xs mb-4">
-          ℹ️ <strong>Initial Password Note:</strong> Default password for new accounts is set to <code>Smiths2026!</code>. The user can update their password in Profile settings upon login.
+        <div class="p-3 bg-blue-50 text-blue-950 border border-blue-200 rounded text-xs mb-4 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-900">
+          <strong>Initial Password Note:</strong> Default password for new accounts is set to <code>Smiths2026!</code>. The user can update their password in Profile settings upon login.
         </div>
         <div class="field">
           <label class="label" for="user-email">Email Address *</label>
@@ -275,7 +275,7 @@ export async function render(container, params, ctx) {
         const teamId = form.teamId.value;
         const active = form.active ? form.active.checked : user.active;
 
-        await updateUser(user.id, { fullName, role, teamId, active });
+        await updateUser(user.id, { fullName, role, teamId, active }, ctx.profile.role);
         toast(`Profile for "${fullName}" updated.`);
         close();
         await refresh();
@@ -289,8 +289,8 @@ export async function render(container, params, ctx) {
       submitText: 'Reset Password',
       contentHtml: `
         <p>Reset password for user <strong>${esc(userName)}</strong>?</p>
-        <div class="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded text-xs mt-3">
-          🔑 Password will be reset to default initial password: <code>Smiths2026!</code>
+        <div class="p-3 bg-amber-50 text-amber-950 border border-amber-200 rounded text-xs mt-3 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900">
+          Password will be reset to default initial password: <code>Smiths2026!</code>
         </div>
         <p class="error-text mt-2"></p>
       `,
@@ -313,7 +313,7 @@ export async function render(container, params, ctx) {
         <p class="error-text"></p>
       `,
       onSubmit: async (form, close) => {
-        await deleteUser(id);
+        await deleteUser(id, ctx.profile.role);
         toast(`User "${name}" deleted.`);
         close();
         await refresh();

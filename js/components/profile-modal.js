@@ -20,8 +20,8 @@ export async function openProfileModal(profile, onUpdateSuccess = null) {
       <div class="field">
         <label class="label">Assigned Role (Read-only)</label>
         <div>
-          <span class="badge badge-accent font-medium text-sm py-1 px-3">
-            🛡️ ${esc(ROLE_LABELS[profile.role] || profile.role)}
+          <span class="badge badge-accent font-semibold text-sm py-1 px-3">
+            ${esc(ROLE_LABELS[profile.role] || profile.role)}
           </span>
         </div>
       </div>
@@ -33,16 +33,16 @@ export async function openProfileModal(profile, onUpdateSuccess = null) {
         <label class="label" for="profile-email">Email Address *</label>
         <input class="input" id="profile-email" name="email" type="email" required value="${esc(currentEmail)}">
       </div>
-      <hr class="my-4 border-gray-200">
-      <h4 class="font-semibold text-sm mb-2 text-gray-900">Change Password</h4>
+      <hr class="my-4 border-gray-200 dark:border-gray-800">
+      <h4 class="font-semibold text-sm mb-2 text-gray-900 dark:text-gray-100">Change Password</h4>
       <p class="text-xs text-gray-500 mb-3">Leave password fields empty if you do not wish to change your password.</p>
       <div class="field">
         <label class="label" for="profile-pass">New Password</label>
-        <input class="input" id="profile-pass" name="password" type="password" minlength="6" placeholder="Min 6 characters">
+        <input class="input" id="profile-pass" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Min 6 characters">
       </div>
       <div class="field">
         <label class="label" for="profile-pass-confirm">Confirm New Password</label>
-        <input class="input" id="profile-pass-confirm" name="confirmPassword" type="password" minlength="6" placeholder="Re-enter new password">
+        <input class="input" id="profile-pass-confirm" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Re-enter new password">
       </div>
       <p class="error-text"></p>
     `,
@@ -50,22 +50,31 @@ export async function openProfileModal(profile, onUpdateSuccess = null) {
     onSubmit: async (form, close) => {
       const fullName = form.fullName.value.trim();
       const email = form.email.value.trim();
-      const password = form.password.value;
-      const confirmPassword = form.confirmPassword.value;
+      const password = form.password.value.trim();
+      const confirmPassword = form.confirmPassword.value.trim();
 
       if (!fullName) throw new Error('Full Name is required.');
       if (!email) throw new Error('Email Address is required.');
 
+      // Only validate password if user filled out at least one of the password fields
+      let passwordToUpdate = null;
       if (password || confirmPassword) {
+        if (!password) {
+          throw new Error('Please enter your new password.');
+        }
+        if (!confirmPassword) {
+          throw new Error('Please re-enter your new password in the confirmation field.');
+        }
         if (password !== confirmPassword) {
           throw new Error('New passwords do not match. Please re-enter.');
         }
         if (password.length < 6) {
           throw new Error('Password must be at least 6 characters long.');
         }
+        passwordToUpdate = password;
       }
 
-      await updateSelfProfile({ fullName, email, password });
+      await updateSelfProfile({ fullName, email, password: passwordToUpdate });
       
       // Update local profile object
       profile.full_name = fullName;

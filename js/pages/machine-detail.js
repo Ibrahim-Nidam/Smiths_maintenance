@@ -9,8 +9,8 @@ import { ROLES } from '../auth.js';
 const STATUS_BADGE_CLASSES = {
   operational: 'badge-accent',
   degraded: 'badge-alert',
-  down: 'badge-solid bg-red-700 text-white',
-  decommissioned: 'badge text-gray-500 bg-gray-100',
+  down: 'badge-alert font-bold',
+  decommissioned: 'badge text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400',
 };
 
 const STATUS_LABELS = {
@@ -18,6 +18,20 @@ const STATUS_LABELS = {
   degraded: 'Degraded',
   down: 'Down',
   decommissioned: 'Decommissioned',
+};
+
+const EVENT_LABELS = {
+  part_installed: 'Part Installed',
+  part_removed: 'Part Removed',
+  part_replaced: 'Part Replaced',
+  parts_swapped: 'Parts Swapped',
+  part_added_to_machine: 'Part Added',
+  rma_tagged: 'RMA Tagged',
+  rma_untagged: 'RMA Untagged',
+  machine_created: 'Machine Created',
+  machine_updated: 'Machine Updated',
+  stock_adjusted: 'Stock Adjusted',
+  correction: 'Correction',
 };
 
 export async function render(container, params, ctx) {
@@ -329,7 +343,7 @@ export async function render(container, params, ctx) {
                   ? `<span class="slot-serial text-gray-400 italic text-xs mt-2">Empty</span>`
                   : `
                     <span class="slot-serial mono font-semibold text-sm mt-1 text-gray-900 break-all">${esc(inst.serial_number)}</span>
-                    ${inst.notes ? `<div class="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mt-1.5 border border-amber-200 leading-tight">📌 ${esc(inst.notes)}</div>` : ''}
+                    ${inst.notes ? `<div class="text-[11px] text-amber-900 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-200 p-1 rounded mt-1.5 border border-amber-300 dark:border-amber-900 leading-tight">${esc(inst.notes)}</div>` : ''}
                   `
                 }
               </div>
@@ -395,7 +409,7 @@ export async function render(container, params, ctx) {
                   return `
                     <tr>
                       <td class="text-xs text-gray-500 whitespace-nowrap">${dateStr}</td>
-                      <td><span class="badge badge-solid text-xs">${esc(ev.event_type)}</span></td>
+                      <td><span class="badge badge-solid text-xs">${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}</span></td>
                       <td>
                         <span class="font-semibold text-gray-900">${esc(partName)}</span>
                         ${ev.position ? `<span class="text-xs text-gray-500 block">Pos ${ev.position}</span>` : ''}

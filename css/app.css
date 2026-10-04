@@ -1,14 +1,14 @@
 /* Modern Design System - Smiths Maintenance App */
 :root {
   /* Colors - Light Theme */
-  --ink: #0f172a;
+  --ink: #090d16;
   --paper: #ffffff;
-  --g50: #f8fafc;
-  --g100: #f1f5f9;
-  --g200: #e2e8f0;
-  --g300: #cbd5e1;
-  --g500: #64748b;
-  --g700: #334155;
+  --g50: #f4f4f5;
+  --g100: #e4e4e7;
+  --g200: #d4d4d8;
+  --g300: #a1a1aa;
+  --g500: #3f3f46;
+  --g700: #18181b;
 
   --accent: #ff6a00;
   --accent-hover: #e85f00;
@@ -453,7 +453,7 @@ a {
   font-size: 0.9em;
 }
 
-/* Badges */
+/* Badges with explicit contrast */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -481,8 +481,9 @@ a {
   background-color: var(--alert-tint);
 }
 
+/* FIXED: Admin role & solid badge high contrast */
 .badge-solid {
-  color: #ffffff;
+  color: var(--paper);
   background-color: var(--ink);
   border-color: var(--ink);
 }
@@ -687,29 +688,28 @@ a {
   color: var(--ink);
 }
 
-/* Dark Mode Overrides for Tailwind classes */
+/* Dark Mode Overrides for Tailwind classes & Contrast Fixes */
 [data-theme="dark"] .bg-white {
   background-color: var(--card-bg) !important;
 }
-[data-theme="dark"] .bg-gray-50 {
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-50\/50,
+[data-theme="dark"] .bg-gray-50\/70 {
   background-color: var(--g50) !important;
 }
 [data-theme="dark"] .bg-gray-100 {
   background-color: var(--g100) !important;
 }
-[data-theme="dark"] .text-gray-900 {
-  color: var(--ink) !important;
-}
+[data-theme="dark"] .text-gray-900,
 [data-theme="dark"] .text-gray-800 {
   color: var(--ink) !important;
 }
-[data-theme="dark"] .text-gray-700 {
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-gray-600 {
   color: var(--g700) !important;
 }
-[data-theme="dark"] .text-gray-600 {
-  color: var(--g500) !important;
-}
-[data-theme="dark"] .text-gray-500 {
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-gray-400 {
   color: var(--g500) !important;
 }
 [data-theme="dark"] .border-gray-100,
@@ -721,6 +721,23 @@ a {
 }
 [data-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--card-border) !important;
+}
+
+/* Additional contrast helpers for dark mode */
+[data-theme="dark"] .text-red-700 {
+  color: #f87171 !important;
+}
+[data-theme="dark"] .text-green-700 {
+  color: #4ade80 !important;
+}
+[data-theme="dark"] .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+[data-theme="dark"] .text-amber-800 {
+  color: #fcd34d !important;
+}
+[data-theme="dark"] .border-amber-200 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
 }
 
 /* Mobile responsive navigation drawer */

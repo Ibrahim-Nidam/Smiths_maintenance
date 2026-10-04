@@ -22,7 +22,9 @@ export function startRouter(container, ctx) {
       if (!m) continue;
       const params = {};
       (r.params || []).forEach((name, i) => (params[name] = decodeURIComponent(m[i + 1])));
-      const mod = await import(`./pages/${r.page}.js`);
+      
+      // Dynamic import with cache buster to ensure instant UI updates
+      const mod = await import(`./pages/${r.page}.js?v=${Date.now()}`);
       container.innerHTML = '';
       await mod.render(container, params, ctx);
       window.scrollTo(0, 0);

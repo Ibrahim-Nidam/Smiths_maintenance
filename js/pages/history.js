@@ -19,26 +19,41 @@ const EVENT_BADGE_CLASSES = {
   part_installed: 'badge-accent',
   part_removed: 'badge-alert',
   part_replaced: 'badge-solid',
-  parts_swapped: 'badge bg-purple-100 text-purple-800 border-purple-300',
+  parts_swapped: 'badge border-purple-600/30 bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-300',
   rma_tagged: 'badge-alert font-bold',
-  rma_untagged: 'badge bg-green-100 text-green-800 border-green-300',
-  machine_created: 'badge bg-blue-100 text-blue-800 border-blue-300',
+  rma_untagged: 'badge border-emerald-600/30 bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300',
+  machine_created: 'badge border-blue-600/30 bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300',
+  machine_updated: 'badge border-amber-600/30 bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
 };
 
 export async function render(container, params, ctx) {
-  // Extract initial search filter from URL query parameters (e.g. #/history?code=K289 or #/history?sn=SN-001)
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
   const initialQuery = urlParams.get('code') || urlParams.get('sn') || urlParams.get('q') || '';
+  let activeCategory = 'all';
 
   container.innerHTML = pageHeader('Maintenance History', 'Complete append-only audit trail and part lifecycle tracking across all machines and positions.') + `
-    <div class="flex flex-wrap gap-4 mb-6 items-center justify-between">
-      <div class="flex flex-wrap gap-3 items-center flex-1 max-w-xl">
-        <input type="search" id="search-history" class="input flex-1" placeholder="Search by Machine, Part #, Serial #, Position, Tech, or Reason..." value="${esc(initialQuery)}">
+    <div class="space-y-4 mb-6">
+      <div class="flex flex-wrap gap-4 items-center justify-between">
+        <div class="flex flex-wrap gap-3 items-center flex-1 max-w-xl">
+          <input type="search" id="search-history" class="input flex-1 font-medium" placeholder="Search by Machine, Part #, Serial #, Position, Tech, or Reason..." value="${esc(initialQuery)}">
+        </div>
+        <span id="event-count" class="text-xs text-gray-600 dark:text-gray-400 font-bold"></span>
       </div>
-      <span id="event-count" class="text-xs text-gray-500 font-medium"></span>
+
+      <!-- Pre-defined Quick Filter Pills -->
+      <div id="history-filter-pills" class="flex flex-wrap gap-2 items-center pt-1 border-t border-gray-200 dark:border-gray-800">
+        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider mr-1">Filter:</span>
+        <button class="filter-pill btn btn-sm btn-primary" data-category="all">All Events</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="installed">Installed</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="replaced">Replaced</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="swapped">Swapped</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="removed">Removed</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="rma">RMA Tags</button>
+        <button class="filter-pill btn btn-sm btn-secondary" data-category="system">Machine/Stock</button>
+      </div>
     </div>
 
-    <div id="history-container"><p class="text-gray-400 text-sm">Loading history events...</p></div>
+    <div id="history-container"><p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Loading history events...</p></div>
   `;
 
   let allEvents = [];
@@ -47,7 +62,7 @@ export async function render(container, params, ctx) {
     allEvents = await listMaintenanceEvents({ limit: 500 });
   } catch (err) {
     container.querySelector('#history-container').innerHTML =
-      `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Failed to load history: ${esc(err.message)}</div>`;
+      `<div class="p-4 bg-red-50 text-red-900 rounded-md border border-red-200 font-semibold">Failed to load history: ${esc(err.message)}</div>`;
     return;
   }
 
@@ -55,6 +70,15 @@ export async function render(container, params, ctx) {
     const query = container.querySelector('#search-history').value.trim().toLowerCase();
 
     const filtered = allEvents.filter(ev => {
+      // 1. Apply category filter
+      if (activeCategory === 'installed' && !['part_installed', 'part_added_to_machine'].includes(ev.event_type)) return false;
+      if (activeCategory === 'replaced' && ev.event_type !== 'part_replaced') return false;
+      if (activeCategory === 'swapped' && ev.event_type !== 'parts_swapped') return false;
+      if (activeCategory === 'removed' && ev.event_type !== 'part_removed') return false;
+      if (activeCategory === 'rma' && !['rma_tagged', 'rma_untagged'].includes(ev.event_type)) return false;
+      if (activeCategory === 'system' && !['stock_adjusted', 'machine_created', 'machine_updated', 'correction'].includes(ev.event_type)) return false;
+
+      // 2. Apply search text query filter
       if (!query) return true;
       const machineCode = ev.machines ? ev.machines.code.toLowerCase() : '';
       const userName = ev.profiles ? ev.profiles.full_name.toLowerCase() : '';
@@ -79,6 +103,16 @@ export async function render(container, params, ctx) {
              eventType.includes(query);
     });
 
+    // Update Category Pills UI
+    container.querySelectorAll('.filter-pill').forEach(btn => {
+      const cat = btn.dataset.category;
+      if (cat === activeCategory) {
+        btn.className = 'filter-pill btn btn-sm btn-primary font-bold';
+      } else {
+        btn.className = 'filter-pill btn btn-sm btn-secondary font-medium';
+      }
+    });
+
     const countEl = container.querySelector('#event-count');
     if (countEl) countEl.textContent = `Showing ${filtered.length} of ${allEvents.length} events`;
 
@@ -87,13 +121,13 @@ export async function render(container, params, ctx) {
     if (!filtered.length) {
       listEl.innerHTML = emptyState(
         'No matching events found',
-        allEvents.length ? 'Try broadening your search term.' : 'Maintenance events will appear here automatically.'
+        allEvents.length ? 'Try changing your category filter or search term.' : 'Maintenance events will appear here automatically.'
       );
       return;
     }
 
     listEl.innerHTML = `
-      <div class="table-wrap">
+      <div class="table-wrap border border-gray-200 dark:border-gray-800">
         <table class="table">
           <thead>
             <tr>
@@ -116,37 +150,38 @@ export async function render(container, params, ctx) {
               const newSn = ev.new_instance ? ev.new_instance.serial_number : null;
               const partName = ev.machine_parts ? ev.machine_parts.name : (ev.part_number || '—');
               const module = ev.machine_parts ? ev.machine_parts.module : '';
+              const badgeClass = EVENT_BADGE_CLASSES[ev.event_type] || 'badge-solid';
 
               return `
                 <tr>
-                  <td class="text-xs text-gray-500 whitespace-nowrap">${dateStr}</td>
+                  <td class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap font-mono font-medium">${dateStr}</td>
                   <td>
-                    <span class="badge ${EVENT_BADGE_CLASSES[ev.event_type] || ''}">
+                    <span class="badge ${badgeClass} text-xs font-semibold">
                       ${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}
                     </span>
                   </td>
                   <td>
                     ${machineCode !== '—'
-                      ? `<a href="#/machines/${encodeURIComponent(machineCode)}" class="font-mono font-semibold text-accent hover:underline">${esc(machineCode)}</a>`
+                      ? `<a href="#/machines/${encodeURIComponent(machineCode)}" class="font-mono font-extrabold text-accent hover:underline">${esc(machineCode)}</a>`
                       : '<span class="text-gray-400">—</span>'
                     }
                   </td>
                   <td>
-                    <span class="font-semibold text-gray-900">${esc(partName)}</span>
-                    ${module ? `<span class="text-xs text-gray-400 capitalize block">${module}</span>` : ''}
+                    <span class="font-bold text-gray-900 dark:text-gray-100">${esc(partName)}</span>
+                    ${module ? `<span class="text-xs text-gray-500 dark:text-gray-400 capitalize block font-medium">${module}</span>` : ''}
                   </td>
                   <td>
-                    ${ev.position ? `<span class="mono font-medium text-gray-700">Pos ${ev.position}</span>` : '<span class="text-gray-400">—</span>'}
+                    ${ev.position ? `<span class="mono font-semibold text-gray-800 dark:text-gray-200">Pos ${ev.position}</span>` : '<span class="text-gray-400">—</span>'}
                   </td>
                   <td class="mono text-xs">
-                    ${oldSn ? `<div class="text-red-700 font-semibold">- ${esc(oldSn)}</div>` : ''}
-                    ${newSn ? `<div class="text-green-700 font-semibold">+ ${esc(newSn)}</div>` : ''}
+                    ${oldSn ? `<div class="text-red-700 dark:text-red-400 font-bold">- ${esc(oldSn)}</div>` : ''}
+                    ${newSn ? `<div class="text-emerald-700 dark:text-emerald-400 font-bold">+ ${esc(newSn)}</div>` : ''}
                     ${!oldSn && !newSn ? '<span class="text-gray-400">—</span>' : ''}
                   </td>
-                  <td class="text-sm font-medium">${esc(userName)}</td>
-                  <td class="text-xs text-gray-600 max-w-xs">
-                    ${ev.reason ? `<div class="font-medium text-gray-800">${esc(ev.reason)}</div>` : ''}
-                    ${ev.notes ? `<div class="text-gray-500 italic mt-0.5">${esc(ev.notes)}</div>` : ''}
+                  <td class="text-sm font-bold text-gray-900 dark:text-gray-100">${esc(userName)}</td>
+                  <td class="text-xs text-gray-700 dark:text-gray-300 max-w-xs font-medium">
+                    ${ev.reason ? `<div class="font-bold text-gray-900 dark:text-gray-100">${esc(ev.reason)}</div>` : ''}
+                    ${ev.notes ? `<div class="text-gray-600 dark:text-gray-400 italic mt-0.5">"${esc(ev.notes)}"</div>` : ''}
                     ${!ev.reason && !ev.notes ? '<span class="text-gray-400">—</span>' : ''}
                   </td>
                 </tr>
@@ -157,6 +192,14 @@ export async function render(container, params, ctx) {
       </div>
     `;
   }
+
+  // Filter Pill Button Click Handler
+  container.querySelectorAll('.filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCategory = btn.dataset.category;
+      filterAndRender();
+    });
+  });
 
   const searchInput = container.querySelector('#search-history');
   if (searchInput) searchInput.addEventListener('input', filterAndRender);

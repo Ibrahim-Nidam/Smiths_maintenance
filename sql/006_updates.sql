@@ -181,3 +181,14 @@ end $$;
 
 grant execute on function reset_user_password to authenticated;
 
+-- 8. RLS Policies for profile management (Admin & Maintenance Manager delete/update)
+drop policy if exists profiles_delete on profiles;
+drop policy if exists profiles_admin_delete on profiles;
+create policy profiles_delete on profiles for delete to authenticated 
+  using (is_global());
+
+drop policy if exists profiles_update on profiles;
+drop policy if exists profiles_admin_update on profiles;
+create policy profiles_update on profiles for update to authenticated 
+  using (id = auth.uid() or is_global()) 
+  with check (id = auth.uid() or is_global());
