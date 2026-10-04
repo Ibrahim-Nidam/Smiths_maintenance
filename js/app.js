@@ -1,6 +1,10 @@
 import { requireAuth, signOut, ROLES } from './auth.js';
 import { startRouter } from './router.js';
 import { openProfileModal } from './components/profile-modal.js';
+import { initThemeToggle } from './components/theme-toggle.js';
+
+// Initialize theme toggle
+initThemeToggle('theme-toggle-btn');
 
 const NAV = [
   { href: '#/dashboard', label: 'Dashboard', roles: null },
@@ -64,4 +68,3 @@ if (profile) {
   document.getElementById('logout').addEventListener('click', signOut);
   startRouter(document.getElementById('view'), { profile });
 }
-

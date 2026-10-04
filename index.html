@@ -3,9 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (function() {
+      const t = localStorage.getItem('smiths_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="js/tailwind-config.js"></script>
@@ -13,7 +19,10 @@
 </head>
 <body class="auth-body">
   <div class="auth-card">
-    <div class="brand"><span class="brand-mark"></span>Maintenance</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+      <div class="brand" style="margin-bottom: 0;"><span class="brand-mark"></span>Maintenance</div>
+      <button id="theme-toggle-btn" class="theme-toggle-btn" type="button"></button>
+    </div>
     <h1 class="auth-title">Sign in</h1>
     <form id="login-form" novalidate>
       <div class="field">
@@ -30,6 +39,10 @@
   </div>
   <script type="module">
     import { signIn, getSession } from './js/auth.js';
+    import { initThemeToggle } from './js/components/theme-toggle.js';
+
+    initThemeToggle('theme-toggle-btn');
+
     if (await getSession()) window.location.href = 'app.html';
     const form = document.getElementById('login-form');
     const btn = document.getElementById('login');
