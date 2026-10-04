@@ -29,7 +29,36 @@ async function checkTeamLeadLimit(teamId, userId = null) {
   }
 }
 
-export async function createUser({ email, password, fullName, role, teamId }) {
+export async function resetUserPassword(userId, newPassword = 'Smiths2026!') {
+  const { error } = await supabase.rpc('reset_user_password', {
+    p_user_id: userId,
+    p_new_password: newPassword,
+  });
+  if (error) {
+    console.error('RPC reset_user_password error:', error);
+    throw new Error(error.message || 'Could not reset user password. Make sure 006_updates.sql script was executed in Supabase SQL editor.');
+  }
+  return true;
+}
+
+export async function checkMaintenanceManagerLimit(userIdToChange = null, targetRole = null) {
+  if (targetRole && targetRole === 'maintenance_manager') return; // Upgrading to MM is always allowed
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, active')
+    .eq('role', 'maintenance_manager')
+    .eq('active', true);
+
+  if (error) throw error;
+  
+  const remainingMMs = (data || []).filter(u => u.id !== userIdToChange);
+  if (remainingMMs.length === 0) {
+    throw new Error('Cannot change or downgrade role. The system requires at least one active Maintenance Manager.');
+  }
+}
+
+export async function createUser({ email, password = 'Smiths2026!', fullName, role, teamId }) {
   if (role === 'team_lead' && teamId) {
     await checkTeamLeadLimit(teamId);
   }
@@ -50,7 +79,12 @@ export async function createUser({ email, password, fullName, role, teamId }) {
     }
   });
 
-  if (authError) throw authError;
+  if (authError) {
+    if (authError.message?.toLowerCase().includes('already registered') || authError.status === 400) {
+      throw new Error(`A user account with email "${email}" already exists.`);
+    }
+    throw authError;
+  }
   if (!authData.user) throw new Error('Failed to create user account');
 
   const { data: profile, error: profileError } = await supabase
@@ -77,6 +111,16 @@ export async function updateUser(id, { fullName, role, teamId, active }) {
     await checkTeamLeadLimit(teamId, id);
   }
 
+  // Check MM minimum count if role is changing away from maintenance_manager or disabling account
+  if (role !== undefined || active === false) {
+    const { data: currentProfile } = await supabase.from('profiles').select('role').eq('id', id).single();
+    if (currentProfile && currentProfile.role === 'maintenance_manager') {
+      if ((role && role !== 'maintenance_manager') || active === false) {
+        await checkMaintenanceManagerLimit(id, role);
+      }
+    }
+  }
+
   const updates = {};
   if (fullName !== undefined) updates.full_name = fullName.trim();
   if (role !== undefined) updates.role = role;
@@ -95,9 +139,16 @@ export async function updateUser(id, { fullName, role, teamId, active }) {
 }
 
 export async function deleteUser(id) {
+  // Prevent deleting the last Maintenance Manager
+  const { data: target } = await supabase.from('profiles').select('role').eq('id', id).single();
+  if (target && target.role === 'maintenance_manager') {
+    await checkMaintenanceManagerLimit(id);
+  }
+
   const { error } = await supabase
     .from('profiles')
     .delete()
     .eq('id', id);
   if (error) throw error;
 }
+

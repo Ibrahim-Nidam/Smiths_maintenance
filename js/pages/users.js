@@ -1,4 +1,4 @@
-import { listUsers, createUser, updateUser, deleteUser } from '../api/users.js';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword } from '../api/users.js';
 import { listTeams } from '../api/teams.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
@@ -21,8 +21,9 @@ const ROLE_BADGE_CLASSES = {
 
 export async function render(container, params, ctx) {
   const isAdmin = ctx.profile.role === ROLES.ADMIN;
+  const canManage = isAdmin || ctx.profile.role === ROLES.MANAGER;
 
-  const actions = isAdmin
+  const actions = canManage
     ? `<button id="btn-add-user" class="btn btn-primary btn-sm">+ Create user</button>`
     : '';
 
@@ -32,13 +33,16 @@ export async function render(container, params, ctx) {
   async function refresh() {
     const listEl = container.querySelector('#users-list');
     try {
-      const [users, teams] = await Promise.all([listUsers(), listTeams().catch(() => [])]);
+      let [rawUsers, teams] = await Promise.all([listUsers(), listTeams().catch(() => [])]);
+
+      // Non-admins must NOT see Admin users in the list
+      const users = isAdmin ? rawUsers : rawUsers.filter(u => u.role !== ROLES.ADMIN);
 
       if (!users.length) {
         listEl.innerHTML = emptyState(
           'No users found',
           'Create user accounts to give technicians and leads access.',
-          isAdmin ? `<button id="btn-add-user-empty" class="btn btn-primary btn-sm">+ Create first user</button>` : ''
+          canManage ? `<button id="btn-add-user-empty" class="btn btn-primary btn-sm">+ Create first user</button>` : ''
         );
         const emptyBtn = listEl.querySelector('#btn-add-user-empty');
         if (emptyBtn) emptyBtn.addEventListener('click', () => handleAddUser(teams));
@@ -54,7 +58,7 @@ export async function render(container, params, ctx) {
                 <th>Role</th>
                 <th>Team</th>
                 <th>Status (Click to toggle)</th>
-                ${isAdmin ? '<th class="text-right">Actions</th>' : ''}
+                ${canManage ? '<th class="text-right">Actions</th>' : ''}
               </tr>
             </thead>
             <tbody>
@@ -82,12 +86,12 @@ export async function render(container, params, ctx) {
                         data-id="${u.id}"
                         data-name="${esc(u.full_name)}"
                         data-active="${u.active}"
-                        ${isSelf ? 'disabled title="You cannot disable your own account"' : ''}>
+                        ${isSelf || !canManage ? 'disabled title="Status change disabled"' : ''}>
                         ${u.active ? '🟢 Active' : '⚪ Disabled'}
                       </button>
                     </td>
-                    ${isAdmin ? `
-                      <td class="text-right">
+                    ${canManage ? `
+                      <td class="text-right flex items-center justify-end gap-1">
                         <button class="btn btn-ghost btn-sm edit-user-btn"
                           data-id="${u.id}"
                           data-name="${esc(u.full_name)}"
@@ -95,6 +99,11 @@ export async function render(container, params, ctx) {
                           data-team="${u.team_id || ''}"
                           data-active="${u.active}">
                           Edit
+                        </button>
+                        <button class="btn btn-ghost btn-sm reset-pass-btn"
+                          data-id="${u.id}"
+                          data-name="${esc(u.full_name)}">
+                          Reset Pass
                         </button>
                         <button class="btn btn-ghost btn-sm btn-danger delete-user-btn"
                           data-id="${u.id}"
@@ -113,58 +122,78 @@ export async function render(container, params, ctx) {
       `;
 
       // Active status inline toggle listener
-      listEl.querySelectorAll('.toggle-active-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const userId = btn.dataset.id;
-          const userName = btn.dataset.name;
-          const currentActive = btn.dataset.active === 'true';
-          const newActive = !currentActive;
+      if (canManage) {
+        listEl.querySelectorAll('.toggle-active-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if (btn.disabled) return;
+            const userId = btn.dataset.id;
+            const userName = btn.dataset.name;
+            const currentActive = btn.dataset.active === 'true';
+            const newActive = !currentActive;
 
-          try {
-            btn.disabled = true;
-            await updateUser(userId, { active: newActive });
-            toast(`User "${userName}" set to ${newActive ? 'Active' : 'Disabled'}.`);
-            await refresh();
-          } catch (err) {
-            toast(err.message || 'Could not update status', 'error');
-            btn.disabled = false;
-          }
+            try {
+              btn.disabled = true;
+              await updateUser(userId, { active: newActive });
+              toast(`User "${userName}" set to ${newActive ? 'Active' : 'Disabled'}.`);
+              await refresh();
+            } catch (err) {
+              toast(err.message || 'Could not update status', 'error');
+              btn.disabled = false;
+            }
+          });
         });
-      });
 
-      listEl.querySelectorAll('.edit-user-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          handleEditUser({
-            id: btn.dataset.id,
-            fullName: btn.dataset.name,
-            role: btn.dataset.role,
-            teamId: btn.dataset.team,
-            active: btn.dataset.active === 'true',
-          }, teams);
+        listEl.querySelectorAll('.edit-user-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            handleEditUser({
+              id: btn.dataset.id,
+              fullName: btn.dataset.name,
+              role: btn.dataset.role,
+              teamId: btn.dataset.team,
+              active: btn.dataset.active === 'true',
+            }, teams);
+          });
         });
-      });
 
-      listEl.querySelectorAll('.delete-user-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          handleDeleteUser(btn.dataset.id, btn.dataset.name);
+        listEl.querySelectorAll('.reset-pass-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            handleResetPass(btn.dataset.id, btn.dataset.name);
+          });
         });
-      });
+
+        listEl.querySelectorAll('.delete-user-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            handleDeleteUser(btn.dataset.id, btn.dataset.name);
+          });
+        });
+      }
     } catch (err) {
       listEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Failed to load users: ${esc(err.message)}</div>`;
     }
   }
 
   function handleAddUser(teams) {
+    const roleOptions = `
+      <option value="${ROLES.TECHNICIAN}">Technician</option>
+      <option value="${ROLES.TEAM_LEAD}">Team Lead</option>
+      <option value="${ROLES.MANAGER}">Maintenance Manager</option>
+      ${isAdmin ? `<option value="${ROLES.ADMIN}">Admin</option>` : ''}
+    `;
+
     openModal({
       title: 'Create User Account',
       contentHtml: `
+        <div class="p-3 bg-blue-50 text-blue-900 border border-blue-200 rounded text-xs mb-4">
+          ℹ️ <strong>Initial Password Note:</strong> Default password for new accounts is set to <code>Smiths2026!</code>. The user can update their password in Profile settings upon login.
+        </div>
         <div class="field">
           <label class="label" for="user-email">Email Address *</label>
           <input class="input" id="user-email" name="email" type="email" required placeholder="technician@company.com">
         </div>
         <div class="field">
           <label class="label" for="user-pass">Initial Password *</label>
-          <input class="input" id="user-pass" name="password" type="password" required minlength="6" placeholder="Min 6 characters">
+          <input class="input" id="user-pass" name="password" type="text" required value="Smiths2026!">
+          <span class="hint">Will be set to default password automatically if unchanged.</span>
         </div>
         <div class="field">
           <label class="label" for="user-name">Full Name *</label>
@@ -173,10 +202,7 @@ export async function render(container, params, ctx) {
         <div class="field">
           <label class="label" for="user-role">Role *</label>
           <select class="select" id="user-role" name="role" required>
-            <option value="${ROLES.TECHNICIAN}">Technician</option>
-            <option value="${ROLES.TEAM_LEAD}">Team Lead</option>
-            <option value="${ROLES.MANAGER}">Maintenance Manager</option>
-            <option value="${ROLES.ADMIN}">Admin</option>
+            ${roleOptions}
           </select>
         </div>
         <div class="field">
@@ -190,11 +216,13 @@ export async function render(container, params, ctx) {
       `,
       submitText: 'Create Account',
       onSubmit: async (form, close) => {
-        const email = form.email.value;
-        const password = form.password.value;
-        const fullName = form.fullName.value;
+        const email = form.email.value.trim();
+        const password = form.password.value || 'Smiths2026!';
+        const fullName = form.fullName.value.trim();
         const role = form.role.value;
         const teamId = form.teamId.value;
+
+        if (!email || !fullName) throw new Error('Email and Full Name are required.');
 
         await createUser({ email, password, fullName, role, teamId });
         toast(`User "${fullName}" created successfully.`);
@@ -207,6 +235,13 @@ export async function render(container, params, ctx) {
   function handleEditUser(user, teams) {
     const isSelf = user.id === ctx.profile.id;
 
+    const roleOptions = `
+      <option value="${ROLES.TECHNICIAN}" ${user.role === ROLES.TECHNICIAN ? 'selected' : ''}>Technician</option>
+      <option value="${ROLES.TEAM_LEAD}" ${user.role === ROLES.TEAM_LEAD ? 'selected' : ''}>Team Lead</option>
+      <option value="${ROLES.MANAGER}" ${user.role === ROLES.MANAGER ? 'selected' : ''}>Maintenance Manager</option>
+      ${isAdmin ? `<option value="${ROLES.ADMIN}" ${user.role === ROLES.ADMIN ? 'selected' : ''}>Admin</option>` : ''}
+    `;
+
     openModal({
       title: 'Edit User Profile',
       contentHtml: `
@@ -217,10 +252,7 @@ export async function render(container, params, ctx) {
         <div class="field">
           <label class="label" for="user-role">Role *</label>
           <select class="select" id="user-role" name="role" required ${isSelf ? 'disabled title="You cannot change your own role"' : ''}>
-            <option value="${ROLES.TECHNICIAN}" ${user.role === ROLES.TECHNICIAN ? 'selected' : ''}>Technician</option>
-            <option value="${ROLES.TEAM_LEAD}" ${user.role === ROLES.TEAM_LEAD ? 'selected' : ''}>Team Lead</option>
-            <option value="${ROLES.MANAGER}" ${user.role === ROLES.MANAGER ? 'selected' : ''}>Maintenance Manager</option>
-            <option value="${ROLES.ADMIN}" ${user.role === ROLES.ADMIN ? 'selected' : ''}>Admin</option>
+            ${roleOptions}
           </select>
         </div>
         <div class="field">
@@ -238,7 +270,7 @@ export async function render(container, params, ctx) {
       `,
       submitText: 'Save Profile',
       onSubmit: async (form, close) => {
-        const fullName = form.fullName.value;
+        const fullName = form.fullName.value.trim();
         const role = form.role ? form.role.value : user.role;
         const teamId = form.teamId.value;
         const active = form.active ? form.active.checked : user.active;
@@ -247,6 +279,25 @@ export async function render(container, params, ctx) {
         toast(`Profile for "${fullName}" updated.`);
         close();
         await refresh();
+      }
+    });
+  }
+
+  function handleResetPass(userId, userName) {
+    openModal({
+      title: 'Reset User Password',
+      submitText: 'Reset Password',
+      contentHtml: `
+        <p>Reset password for user <strong>${esc(userName)}</strong>?</p>
+        <div class="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded text-xs mt-3">
+          🔑 Password will be reset to default initial password: <code>Smiths2026!</code>
+        </div>
+        <p class="error-text mt-2"></p>
+      `,
+      onSubmit: async (form, close) => {
+        await resetUserPassword(userId, 'Smiths2026!');
+        toast(`Password for "${userName}" reset to default (Smiths2026!).`);
+        close();
       }
     });
   }
@@ -278,3 +329,4 @@ export async function render(container, params, ctx) {
 
   await refresh();
 }
+

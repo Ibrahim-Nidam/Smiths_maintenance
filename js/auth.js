@@ -32,6 +32,35 @@ export async function getProfile() {
   return data;
 }
 
+export async function updateSelfProfile({ fullName, email, password }) {
+  const session = await getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const authUpdates = {};
+  if (email && email.trim() !== session.user.email) {
+    authUpdates.email = email.trim();
+  }
+  if (password && password.trim()) {
+    if (password.trim().length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+    authUpdates.password = password.trim();
+  }
+
+  if (Object.keys(authUpdates).length > 0) {
+    const { error: authErr } = await supabase.auth.updateUser(authUpdates);
+    if (authErr) throw authErr;
+  }
+
+  if (fullName !== undefined && fullName.trim()) {
+    const { error: profileErr } = await supabase
+      .from('profiles')
+      .update({ full_name: fullName.trim() })
+      .eq('id', session.user.id);
+    if (profileErr) throw profileErr;
+  }
+}
+
 // Redirects to login if not signed in, or returns null if the role is not allowed.
 // This is only for UX. Real security is enforced by RLS and RPC functions.
 export async function requireAuth(allowedRoles = null) {
@@ -43,3 +72,4 @@ export async function requireAuth(allowedRoles = null) {
   if (allowedRoles && !allowedRoles.includes(profile.role)) return null;
   return profile;
 }
+

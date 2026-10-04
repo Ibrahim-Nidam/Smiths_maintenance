@@ -155,3 +155,29 @@ create policy machines_delete on machines for delete to authenticated using (is_
 grant execute on function update_unit_details to authenticated;
 grant execute on function add_serialized_unit_to_stock to authenticated;
 grant execute on function delete_machine to authenticated;
+
+-- 7. Password reset function for Admin and Maintenance Manager
+create or replace function reset_user_password(
+  p_user_id uuid,
+  p_new_password text default 'Smiths2026!'
+) returns void
+language plpgsql security definer set search_path = public, auth, extensions as $$
+declare
+  caller profiles;
+begin
+  select * into caller from public.profiles where id = auth.uid();
+  if caller is null or caller.role not in ('admin', 'maintenance_manager') then
+    raise exception 'Permission denied: Only Admin or Maintenance Manager can reset user passwords.';
+  end if;
+
+  update auth.users
+     set encrypted_password = extensions.crypt(p_new_password, extensions.gen_salt('bf'))
+   where id = p_user_id;
+
+  if not found then
+    raise exception 'User account not found in authentication system.';
+  end if;
+end $$;
+
+grant execute on function reset_user_password to authenticated;
+

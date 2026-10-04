@@ -1,5 +1,6 @@
 import { requireAuth, signOut, ROLES } from './auth.js';
 import { startRouter } from './router.js';
+import { openProfileModal } from './components/profile-modal.js';
 
 const NAV = [
   { href: '#/dashboard', label: 'Dashboard', roles: null },
@@ -8,7 +9,7 @@ const NAV = [
   { href: '#/rma',       label: 'RMA',       roles: null },
   { href: '#/history',   label: 'History',   roles: null },
   { href: '#/teams',     label: 'Teams',     roles: [ROLES.ADMIN, ROLES.MANAGER] },
-  { href: '#/users',     label: 'Users',     roles: [ROLES.ADMIN] },
+  { href: '#/users',     label: 'Users',     roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { href: '#/settings',  label: 'Settings',  roles: [ROLES.ADMIN, ROLES.MANAGER] },
 ];
 
@@ -26,6 +27,16 @@ if (profile) {
 
   document.getElementById('user-name').textContent = profile.full_name;
   document.getElementById('user-role').textContent = ROLE_LABELS[profile.role] ?? profile.role;
+
+  // Open profile modal when clicking user name
+  const userBtn = document.getElementById('user-profile-btn');
+  if (userBtn) {
+    userBtn.addEventListener('click', () => {
+      openProfileModal(profile, (updated) => {
+        document.getElementById('user-name').textContent = updated.full_name;
+      });
+    });
+  }
 
   nav.innerHTML = NAV
     .filter(n => !n.roles || n.roles.includes(profile.role))
@@ -53,3 +64,4 @@ if (profile) {
   document.getElementById('logout').addEventListener('click', signOut);
   startRouter(document.getElementById('view'), { profile });
 }
+
