@@ -8,6 +8,7 @@ import {
 } from '../api/machines.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
+import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
 
@@ -138,7 +139,7 @@ export async function render(container, params, ctx) {
                       ${modParts.map(p => `
                         <tr>
                           <td class="font-semibold">${esc(p.name)}</td>
-                          <td class="mono font-semibold text-gray-700">${esc(p.part_number)}</td>
+                          <td class="mono font-semibold text-gray-700">${esc(p.part_number)}${copyButton(p.part_number, 'Copy part number')}</td>
                           <td>
                             ${p.serialized
                               ? '<span class="badge badge-accent">Serialized</span>'

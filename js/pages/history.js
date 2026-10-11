@@ -1,5 +1,6 @@
 import { listMaintenanceEvents } from '../api/history.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { copyButton } from '../components/input-enhancements.js';
 
 const EVENT_LABELS = {
   part_installed: 'Part Installed',
@@ -32,7 +33,7 @@ export async function render(container, params, ctx) {
   let activeCategory = 'all';
 
   container.innerHTML = pageHeader('Maintenance History', 'Complete append-only audit trail and part lifecycle tracking across all machines and positions.') + `
-    <div class="space-y-4 mb-6">
+    <div class="space-y-4 mb-6 history-filters">
       <div class="flex flex-wrap gap-4 items-center justify-between">
         <div class="flex flex-wrap gap-3 items-center flex-1 max-w-xl">
           <input type="search" id="search-history" class="input flex-1 font-medium" placeholder="Search by Machine, Part #, Serial #, Position, Tech, or Reason..." value="${esc(initialQuery)}">
@@ -168,14 +169,15 @@ export async function render(container, params, ctx) {
                   </td>
                   <td>
                     <span class="font-bold text-gray-900 dark:text-gray-100">${esc(partName)}</span>
+                    ${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}
                     ${module ? `<span class="text-xs text-gray-500 dark:text-gray-400 capitalize block font-medium">${module}</span>` : ''}
                   </td>
                   <td>
                     ${ev.position ? `<span class="mono font-semibold text-gray-800 dark:text-gray-200">Pos ${ev.position}</span>` : '<span class="text-gray-400">—</span>'}
                   </td>
                   <td class="mono text-xs">
-                    ${oldSn ? `<div class="text-red-700 dark:text-red-400 font-bold">- ${esc(oldSn)}</div>` : ''}
-                    ${newSn ? `<div class="text-emerald-700 dark:text-emerald-400 font-bold">+ ${esc(newSn)}</div>` : ''}
+                    ${oldSn ? `<div class="text-red-700 dark:text-red-400 font-bold">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                    ${newSn ? `<div class="text-emerald-700 dark:text-emerald-400 font-bold">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
                     ${!oldSn && !newSn ? '<span class="text-gray-400">—</span>' : ''}
                   </td>
                   <td class="text-sm font-bold text-gray-900 dark:text-gray-100">${esc(userName)}</td>

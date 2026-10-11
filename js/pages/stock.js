@@ -14,6 +14,7 @@ import { updateSlotInstance } from '../api/parts.js';
 import { listMachineTypes, listTypeTemplates } from '../api/machines.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
+import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
 
@@ -65,7 +66,7 @@ export async function render(container, params, ctx) {
         }, {}));
 
         contentEl.innerHTML = `
-          <div class="mb-4">
+          <div class="mb-4 stock-search-row">
             <input type="search" id="search-unit" class="input w-64" placeholder="Filter by part or serial #...">
           </div>
           <div class="table-wrap">
@@ -73,6 +74,7 @@ export async function render(container, params, ctx) {
               <thead>
                 <tr>
                   <th>Part Number</th>
+                  <th>Part Name</th>
                   <th>Units</th>
                   <th>Installed</th>
                   <th>DOA</th>
@@ -86,19 +88,20 @@ export async function render(container, params, ctx) {
                   const doa = group.filter(u => u.doa).length;
                   return `
                     <tr class="stock-group-row" data-group="${index}">
-                      <td class="mono">${esc(partNumber)}</td>
+                      <td class="mono">${esc(partNumber)}${partNumber !== 'Uncategorized' ? copyButton(partNumber, 'Copy part number') : ''}</td>
+                      <td>${esc(group[0].part_name || '—')}</td>
                       <td>${group.length}</td>
                       <td>${installed}</td>
                       <td>${doa ? `<span class="badge badge-alert">${doa} DOA</span>` : '<span class="text-muted">—</span>'}</td>
                       <td class="text-right"><button class="btn btn-secondary btn-sm toggle-group" data-group="${index}" aria-expanded="false">Show units</button></td>
                     </tr>
                     <tr class="stock-group-details" data-group-details="${index}" hidden>
-                      <td colspan="5">
+                      <td colspan="6">
                         <div class="stock-unit-list">
                           ${group.map(u => `
                             <div class="stock-unit-row">
                               <div>
-                                <span class="mono">${esc(u.serial_number)}</span>
+                                <span class="mono">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</span>
                                 ${u.doa ? '<span class="badge badge-alert ml-2">DOA</span>' : ''}
                               </div>
                               <span class="text-sm text-secondary">
@@ -191,7 +194,7 @@ export async function render(container, params, ctx) {
                         ${esc(it.name)}
                         ${isLow ? ' <span class="badge badge-alert text-[11px] ml-2">Low Stock</span>' : ''}
                       </td>
-                      <td class="mono">${esc(it.part_number || '—')}</td>
+                      <td class="mono">${esc(it.part_number || '—')}${it.part_number ? copyButton(it.part_number, 'Copy part number') : ''}</td>
                       <td class="mono text-base ${isLow ? 'text-amber-700' : ''}">${it.quantity} ${esc(it.unit)}</td>
                       <td class="mono text-secondary">${it.min_quantity} ${esc(it.unit)}</td>
                       <td class="text-sm text-secondary">${esc(it.location || '—')}</td>

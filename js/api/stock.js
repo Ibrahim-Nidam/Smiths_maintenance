@@ -27,6 +27,12 @@ export async function listSerializedUnits() {
 
   if (error) throw error;
 
+  const partNumbers = [...new Set(data.map(u => u.part_number).filter(Boolean))];
+  const { data: definitions } = partNumbers.length
+    ? await supabase.from('part_definitions').select('part_number, name').in('part_number', partNumbers).eq('active', true)
+    : { data: [] };
+  const namesByPartNumber = Object.fromEntries((definitions || []).map(def => [def.part_number, def.name]));
+
   return data.map(u => {
     let machineCode = null;
     let position = null;
@@ -39,6 +45,7 @@ export async function listSerializedUnits() {
     }
     return {
       ...u,
+      part_name: namesByPartNumber[u.part_number] || null,
       display_location: u.storage_location || u.location,
       machine_code: machineCode,
       position: position,

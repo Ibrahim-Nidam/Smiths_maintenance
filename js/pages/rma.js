@@ -2,6 +2,7 @@ import { listRmaUnits } from '../api/rma.js';
 import { setRmaTag } from '../api/parts.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
+import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 
 export async function render(container, params, ctx) {
@@ -40,8 +41,8 @@ export async function render(container, params, ctx) {
               ${units.map(u => `
                 <tr>
                   <td class="text-xs text-gray-500">${u.rma_tagged_at ? new Date(u.rma_tagged_at).toLocaleString() : '—'}</td>
-                  <td class="mono font-semibold">${esc(u.part_number)}</td>
-                  <td class="mono font-semibold text-red-700">${esc(u.serial_number)}</td>
+                  <td class="mono font-semibold">${esc(u.part_number)}${copyButton(u.part_number, 'Copy part number')}</td>
+                  <td class="mono font-semibold text-red-700">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</td>
                   <td>
                     ${u.location === 'machine' && u.machine_code
                       ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="font-mono text-accent hover:underline">${esc(u.machine_code)} (Pos ${u.position})</a>`

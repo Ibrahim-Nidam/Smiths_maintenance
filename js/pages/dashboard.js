@@ -3,6 +3,7 @@ import { listRmaUnits } from '../api/rma.js';
 import { listStockItems } from '../api/stock.js';
 import { pageHeader, esc } from '../components/ui.js';
 import { ROLES } from '../auth.js';
+import { copyButton } from '../components/input-enhancements.js';
 
 export async function render(container, params, ctx) {
   const userName = ctx.profile.full_name || 'Technician';
@@ -136,7 +137,7 @@ export async function render(container, params, ctx) {
             ${lowStockItems.slice(0, 4).map(it => `
               <div class="p-2.5 rounded border border-amber-300 dark:border-amber-800 bg-white dark:bg-gray-900 flex items-center justify-between text-xs">
                 <div>
-                  <span class="font-bold font-mono text-gray-900 dark:text-gray-100">${esc(it.part_number)}</span>
+                  <span class="font-bold font-mono text-gray-900 dark:text-gray-100">${esc(it.part_number)}${copyButton(it.part_number, 'Copy part number')}</span>
                   <span class="text-gray-700 dark:text-gray-300 block truncate max-w-[160px] font-medium">${esc(it.name)}</span>
                 </div>
                 <div class="text-right">

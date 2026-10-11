@@ -5,6 +5,7 @@ import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
+import { copyButton } from '../components/input-enhancements.js';
 
 const STATUS_BADGE_CLASSES = {
   operational: 'badge-accent',
@@ -342,7 +343,7 @@ export async function render(container, params, ctx) {
                           <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div class="flex items-center gap-2 flex-wrap">
                               <span class="font-semibold text-base text-gray-900">${esc(p.name)}</span>
-                              <span class="mono badge badge-solid text-xs">${esc(p.part_number)}</span>
+                              <span class="mono badge badge-solid text-xs">${esc(p.part_number)}</span>${copyButton(p.part_number, 'Copy part number')}
                               ${p.serialized
                                 ? `<span class="badge badge-accent text-xs">Serialized (${installedCount}/${p.quantity} installed, ${p.placement_mode})</span>`
                                 : `<span class="badge text-xs text-gray-600">Non-serialized (${p.quantity} pcs)</span>`
@@ -409,7 +410,7 @@ export async function render(container, params, ctx) {
                 ${isEmpty
                   ? `<span class="slot-serial text-gray-400 italic text-xs mt-2">Empty</span>`
                   : `
-                    <span class="slot-serial mono font-semibold text-sm mt-1 text-gray-900 break-all">${esc(inst.serial_number)}</span>
+                    <span class="slot-serial mono font-semibold text-sm mt-1 text-gray-900 break-all">${esc(inst.serial_number)}${copyButton(inst.serial_number, 'Copy serial number')}</span>
                     ${inst.notes ? `<div class="text-[11px] text-amber-900 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-200 p-1 rounded mt-1.5 border border-amber-300 dark:border-amber-900 leading-tight">${esc(inst.notes)}</div>` : ''}
                   `
                 }
@@ -478,12 +479,12 @@ export async function render(container, params, ctx) {
                       <td class="text-xs text-gray-500 whitespace-nowrap">${dateStr}</td>
                       <td><span class="badge badge-solid text-xs">${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}</span></td>
                       <td>
-                        <span class="font-semibold text-gray-900">${esc(partName)}</span>
+                        <span class="font-semibold text-gray-900">${esc(partName)}${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}</span>
                         ${ev.position ? `<span class="text-xs text-gray-500 block">Pos ${ev.position}</span>` : ''}
                       </td>
                       <td class="mono text-xs">
-                        ${oldSn ? `<div class="text-red-700 font-semibold">- ${esc(oldSn)}</div>` : ''}
-                        ${newSn ? `<div class="text-green-700 font-semibold">+ ${esc(newSn)}</div>` : ''}
+                        ${oldSn ? `<div class="text-red-700 font-semibold">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                        ${newSn ? `<div class="text-green-700 font-semibold">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
                         ${!oldSn && !newSn ? '<span class="text-gray-400">—</span>' : ''}
                       </td>
                       <td class="text-sm font-medium">${esc(userName)}</td>
