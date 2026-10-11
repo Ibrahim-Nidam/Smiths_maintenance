@@ -139,6 +139,21 @@ export async function listTypeTemplates(machineTypeId) {
   return data;
 }
 
+export async function listTemplatePartAvailability({ machineTypeIds, module, partNumber }) {
+  if (!machineTypeIds.length) return [];
+
+  const { data, error } = await supabase
+    .from('part_definitions')
+    .select('machine_type_id')
+    .in('machine_type_id', machineTypeIds)
+    .eq('module', module)
+    .eq('part_number', partNumber.trim().toUpperCase())
+    .eq('active', true);
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function createTypeTemplate(def) {
   const { data, error } = await supabase
     .from('part_definitions')

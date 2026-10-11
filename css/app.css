@@ -6,7 +6,7 @@
   --g50: #f4f4f5;
   --g100: #e4e4e7;
   --g200: #d4d4d8;
-  --g300: #a1a1aa;
+  --g300: #71717a;
   --g500: #3f3f46;
   --g700: #18181b;
 
@@ -305,7 +305,7 @@ a {
 
 .btn-primary {
   background-color: var(--accent);
-  color: #ffffff;
+  color: var(--ink);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(255, 106, 0, 0.2);
 }
@@ -392,7 +392,36 @@ a {
 
 .hint {
   font-size: 13px;
-  color: var(--g500);
+  color: #52525b;
+}
+
+.text-secondary {
+  color: #52525b;
+}
+
+[data-theme="dark"] .text-secondary {
+  color: var(--g700);
+}
+
+.stock-unit-list {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.stock-unit-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(140px, 1fr) minmax(140px, 1.5fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--g200);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+}
+
+.stock-group-details td {
+  background: var(--g50);
 }
 
 .error-text {
@@ -420,7 +449,7 @@ a {
 
 .table th {
   background-color: var(--g50);
-  color: var(--g500);
+  color: #3f3f46;
   font-weight: 600;
   font-size: 13px;
   text-transform: uppercase;
@@ -711,6 +740,22 @@ a {
 [data-theme="dark"] .text-gray-500,
 [data-theme="dark"] .text-gray-400 {
   color: var(--g500) !important;
+}
+
+[data-theme="light"] .text-gray-500 {
+  color: #52525b !important;
+}
+
+[data-theme="light"] .text-gray-600 {
+  color: #3f3f46 !important;
+}
+
+[data-theme="light"] .text-accent {
+  color: var(--accent-text) !important;
+}
+
+[data-theme="light"] .text-gray-400 {
+  color: #52525b !important;
 }
 [data-theme="dark"] .border-gray-100,
 [data-theme="dark"] .border-gray-200 {

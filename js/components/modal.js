@@ -1,5 +1,5 @@
 // Reusable modal dialog component
-export function openModal({ title, contentHtml, onSubmit, submitText = 'Save', danger = false }) {
+export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitText = 'Save', danger = false }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
 
@@ -48,6 +48,13 @@ export function openModal({ title, contentHtml, onSubmit, submitText = 'Save', d
   // Focus first input
   const firstInput = form.querySelector('input, select, textarea');
   if (firstInput) firstInput.focus();
+
+  if (onOpen) {
+    Promise.resolve(onOpen(backdrop)).catch(err => {
+      const errEl = form.querySelector('.error-text');
+      if (errEl) errEl.textContent = err.message || 'Could not load available machine types.';
+    });
+  }
 
   return close;
 }

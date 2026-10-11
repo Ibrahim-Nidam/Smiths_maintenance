@@ -10,6 +10,7 @@ export async function addPartToMachine({
   quantity,
   placementMode,
   rmaApplicable,
+  templateTypeIds = [],
 }) {
   const cleanPn = partNumber.trim().toUpperCase();
 
@@ -37,6 +38,7 @@ export async function addPartToMachine({
     p_placement: placementMode || 'flexible',
     p_rma_applicable: !!rmaApplicable,
     p_add_to_template: true, // Automatically sync to type template
+    p_template_type_ids: templateTypeIds,
   });
 
   if (error) throw error;
@@ -97,6 +99,27 @@ export async function setRmaTag({ instanceId, tagged, note = null }) {
     p_instance_id: instanceId,
     p_tagged: !!tagged,
     p_note: note ? note.trim() : null,
+  });
+  if (error) throw error;
+}
+
+export async function updateMachinePart({ machinePartId, name, partNumber, quantity, placementMode, rmaApplicable, templateTypeIds = [] }) {
+  const { error } = await supabase.rpc('update_machine_part', {
+    p_machine_part_id: machinePartId,
+    p_name: name.trim(),
+    p_part_number: partNumber.trim().toUpperCase(),
+    p_quantity: parseInt(quantity, 10) || 1,
+    p_placement: placementMode,
+    p_rma_applicable: !!rmaApplicable,
+    p_template_type_ids: templateTypeIds,
+  });
+  if (error) throw error;
+}
+
+export async function deleteMachinePart({ machinePartId, templateTypeIds = [] }) {
+  const { error } = await supabase.rpc('delete_machine_part', {
+    p_machine_part_id: machinePartId,
+    p_template_type_ids: templateTypeIds,
   });
   if (error) throw error;
 }

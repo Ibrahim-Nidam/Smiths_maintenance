@@ -1,5 +1,5 @@
-import { getMachineByCode, updateMachine, deleteMachine } from '../api/machines.js';
-import { addPartToMachine, setSlotSerial, updateSlotInstance, replaceSerializedPart, replaceNonSerializedPart, swapParts, setRmaTag } from '../api/parts.js';
+import { getMachineByCode, updateMachine, deleteMachine, listMachineTypes, listTemplatePartAvailability } from '../api/machines.js';
+import { addPartToMachine, updateMachinePart, deleteMachinePart, setSlotSerial, updateSlotInstance, replaceSerializedPart, replaceNonSerializedPart, swapParts, setRmaTag } from '../api/parts.js';
 import { listMaintenanceEvents } from '../api/history.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
@@ -171,7 +171,18 @@ export async function render(container, params, ctx) {
 
     const addPartBtn = container.querySelector('#btn-add-part');
     if (addPartBtn) {
-      addPartBtn.addEventListener('click', () => {
+      addPartBtn.addEventListener('click', async () => {
+        const isGlobal = [ROLES.ADMIN, ROLES.MANAGER].includes(ctx.profile.role);
+        let machineTypes = [];
+        if (isGlobal) {
+          try {
+            machineTypes = await listMachineTypes();
+          } catch (err) {
+            toast(`Could not load machine types: ${err.message}`, 'error');
+            return;
+          }
+        }
+
         openModal({
           title: `Add Part to Machine ${machine.code}`,
           contentHtml: `
@@ -210,12 +221,63 @@ export async function render(container, params, ctx) {
               <input type="checkbox" id="ap-rma" name="rmaApplicable" checked>
               <label class="label mb-0 cursor-pointer" for="ap-rma">RMA applicable</label>
             </div>
+            ${isGlobal ? `
+              <div class="field border border-gray-200 rounded-md p-3">
+                <div class="flex items-center gap-3">
+                  <input type="checkbox" id="ap-sync-templates" name="syncTemplates">
+                  <label class="label mb-0 cursor-pointer" for="ap-sync-templates">This part is also present in other machine types</label>
+                </div>
+                <div id="ap-template-types" class="hidden mt-3 space-y-2">
+                  <p class="text-xs text-gray-500">Select the other templates that should include this part. Existing definitions are shown automatically and will not be duplicated.</p>
+                  <div id="ap-template-type-list" class="space-y-2"></div>
+                </div>
+              </div>
+            ` : ''}
             <p class="error-text"></p>
           `,
           submitText: 'Add Part to Machine',
+          onOpen: async (modal) => {
+            if (!isGlobal) return;
+            const syncCheckbox = modal.querySelector('#ap-sync-templates');
+            const typeContainer = modal.querySelector('#ap-template-types');
+            const typeList = modal.querySelector('#ap-template-type-list');
+            const loadTemplateTypes = async () => {
+              const selectedModule = modal.querySelector('#ap-module').value;
+              const partNumber = modal.querySelector('#ap-pn').value.trim();
+              typeContainer.classList.toggle('hidden', !syncCheckbox.checked);
+              if (!syncCheckbox.checked || !partNumber) {
+                typeList.innerHTML = '';
+                return;
+              }
+              const otherTypes = machineTypes.filter(t => t.id !== machine.machine_type_id);
+              const existing = await listTemplatePartAvailability({
+                machineTypeIds: otherTypes.map(t => t.id),
+                module: selectedModule,
+                partNumber,
+              });
+              const existingIds = new Set(existing.map(row => row.machine_type_id));
+              typeList.innerHTML = otherTypes.length
+                ? otherTypes.map(type => {
+                    const alreadyPresent = existingIds.has(type.id);
+                    return `
+                      <label class="flex items-center gap-2 text-sm ${alreadyPresent ? 'text-gray-500' : ''}">
+                        <input type="checkbox" name="templateTypeIds" value="${type.id}" ${alreadyPresent ? 'checked disabled' : ''}>
+                        <span>${esc(type.name)}${alreadyPresent ? ' (already contains this part)' : ''}</span>
+                      </label>
+                    `;
+                  }).join('')
+                : '<p class="text-xs text-gray-500">No other machine types are available.</p>';
+            };
+            syncCheckbox.addEventListener('change', loadTemplateTypes);
+            modal.querySelector('#ap-module').addEventListener('change', loadTemplateTypes);
+            modal.querySelector('#ap-pn').addEventListener('input', loadTemplateTypes);
+            await loadTemplateTypes();
+          },
           onSubmit: async (form, close) => {
             const name = form.name.value;
             const partNumber = form.partNumber.value;
+            const templateTypeIds = [...form.querySelectorAll('input[name="templateTypeIds"]:checked:not(:disabled)')]
+              .map(input => input.value);
             const { templateExisted } = await addPartToMachine({
               machineId: machine.id,
               machineTypeId: machine.machine_type_id,
@@ -226,6 +288,7 @@ export async function render(container, params, ctx) {
               quantity: form.quantity.value,
               placementMode: form.placementMode.value,
               rmaApplicable: form.rmaApplicable.checked,
+              templateTypeIds,
             });
 
             if (templateExisted) {
@@ -287,6 +350,10 @@ export async function render(container, params, ctx) {
                             </div>
 
                             <div class="flex items-center gap-2">
+                              ${canManage ? `
+                                <button class="btn btn-ghost btn-sm text-xs edit-machine-part-btn" data-part-id="${p.id}">Edit part</button>
+                                <button class="btn btn-ghost btn-sm text-xs text-red-700 delete-machine-part-btn" data-part-id="${p.id}">Remove part</button>
+                              ` : ''}
                               ${p.serialized
                                 ? `<button class="btn btn-ghost btn-sm text-xs toggle-expand-btn" data-part-id="${p.id}">
                                     ${isExpanded ? '▲ Collapse Positions' : `▼ Expand Positions (${installedCount}/${p.quantity})`}
@@ -439,6 +506,20 @@ export async function render(container, params, ctx) {
   }
 
   function attachActionHandlers(container, machine, canManage, reload) {
+    container.querySelectorAll('.edit-machine-part-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const part = machine.machine_parts.find(item => item.id === btn.dataset.partId);
+        if (part) await openMachinePartEditor(part, machine, reload);
+      });
+    });
+
+    container.querySelectorAll('.delete-machine-part-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const part = machine.machine_parts.find(item => item.id === btn.dataset.partId);
+        if (part) await openMachinePartRemoval(part, machine, reload);
+      });
+    });
+
     container.querySelectorAll('.toggle-expand-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const partId = btn.dataset.partId;
@@ -686,6 +767,131 @@ export async function render(container, params, ctx) {
           }
         });
       });
+    });
+  }
+
+  async function getMatchingTemplateTypes(machine, part) {
+    if (![ROLES.ADMIN, ROLES.MANAGER].includes(ctx.profile.role)) return [];
+    const types = await listMachineTypes();
+    const otherTypes = types.filter(type => type.id !== machine.machine_type_id);
+    const existing = await listTemplatePartAvailability({
+      machineTypeIds: otherTypes.map(type => type.id),
+      module: part.module,
+      partNumber: part.part_number,
+    });
+    const existingIds = new Set(existing.map(row => row.machine_type_id));
+    return otherTypes.filter(type => existingIds.has(type.id));
+  }
+
+  function renderTemplateChoices(types) {
+    return types.map(type => `
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="templateTypeIds" value="${type.id}">
+        <span>${esc(type.name)}</span>
+      </label>
+    `).join('');
+  }
+
+  async function openMachinePartEditor(part, machine, reload) {
+    const templateTypes = await getMatchingTemplateTypes(machine, part);
+    openModal({
+      title: `Edit Part — ${part.name}`,
+      contentHtml: `
+        <div class="field">
+          <label class="label" for="mp-name">Part Name *</label>
+          <input class="input" id="mp-name" name="name" required value="${esc(part.name)}">
+        </div>
+        <div class="field">
+          <label class="label" for="mp-pn">Part Number *</label>
+          <input class="input font-mono" id="mp-pn" name="partNumber" required value="${esc(part.part_number)}" style="text-transform:uppercase">
+        </div>
+        <div class="field">
+          <label class="label" for="mp-qty">Quantity per machine *</label>
+          <input class="input" id="mp-qty" name="quantity" type="number" min="1" required value="${part.quantity}">
+        </div>
+        <div class="field">
+          <label class="label" for="mp-placement">Placement Mode *</label>
+          <select class="select" name="placementMode">
+            <option value="flexible" ${part.placement_mode === 'flexible' ? 'selected' : ''}>Flexible</option>
+            <option value="fixed" ${part.placement_mode === 'fixed' ? 'selected' : ''}>Fixed</option>
+          </select>
+        </div>
+        <div class="field flex items-center gap-3">
+          <input type="checkbox" name="rmaApplicable" ${part.rma_applicable ? 'checked' : ''}>
+          <label class="label mb-0 cursor-pointer">RMA applicable</label>
+        </div>
+        ${templateTypes.length ? `
+          <div class="field border border-gray-200 rounded-md p-3">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" id="mp-sync" name="syncTemplates">
+              <label class="label mb-0 cursor-pointer" for="mp-sync">Apply these edits to other templates containing this part</label>
+            </div>
+            <div id="mp-template-list" class="hidden mt-3 space-y-2">${renderTemplateChoices(templateTypes)}</div>
+          </div>
+        ` : ''}
+        <p class="error-text"></p>
+      `,
+      submitText: 'Save Part',
+      onOpen: modal => {
+        const sync = modal.querySelector('#mp-sync');
+        const list = modal.querySelector('#mp-template-list');
+        if (sync) sync.addEventListener('change', () => list.classList.toggle('hidden', !sync.checked));
+      },
+      onSubmit: async (form, close) => {
+        const templateTypeIds = [...form.querySelectorAll('input[name="templateTypeIds"]:checked')].map(input => input.value);
+        await updateMachinePart({
+          machinePartId: part.id,
+          name: form.name.value,
+          partNumber: form.partNumber.value,
+          quantity: form.quantity.value,
+          placementMode: form.placementMode.value,
+          rmaApplicable: form.rmaApplicable.checked,
+          templateTypeIds,
+        });
+        toast(`Part "${form.name.value}" updated.`);
+        close();
+        await reload();
+      }
+    });
+  }
+
+  async function openMachinePartRemoval(part, machine, reload) {
+    const occupied = (part.machine_slots || []).some(slot => slot.instance_id);
+    if (occupied) {
+      toast(`Remove installed serials from "${part.name}" before removing the part.`, 'error');
+      return;
+    }
+    const templateTypes = await getMatchingTemplateTypes(machine, part);
+    openModal({
+      title: `Remove Part — ${part.name}`,
+      danger: true,
+      contentHtml: `
+        <p>Remove <strong>${esc(part.name)}</strong> (${esc(part.part_number)}) from this machine?</p>
+        ${templateTypes.length ? `
+          <div class="field border border-gray-200 rounded-md p-3 mt-4">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" id="mp-delete-sync" name="syncTemplates">
+              <label class="label mb-0 cursor-pointer" for="mp-delete-sync">Also remove it from other templates containing this part</label>
+            </div>
+            <div id="mp-delete-template-list" class="hidden mt-3 space-y-2">${renderTemplateChoices(templateTypes)}</div>
+          </div>
+        ` : ''}
+        <p class="text-sm text-gray-500 mt-3">Serialized units must be removed before the part definition can be deleted.</p>
+        <p class="error-text"></p>
+      `,
+      submitText: 'Remove Part',
+      onOpen: modal => {
+        const sync = modal.querySelector('#mp-delete-sync');
+        const list = modal.querySelector('#mp-delete-template-list');
+        if (sync) sync.addEventListener('change', () => list.classList.toggle('hidden', !sync.checked));
+      },
+      onSubmit: async (form, close) => {
+        const templateTypeIds = [...form.querySelectorAll('input[name="templateTypeIds"]:checked')].map(input => input.value);
+        await deleteMachinePart({ machinePartId: part.id, templateTypeIds });
+        toast(`Part "${part.name}" removed.`);
+        close();
+        await reload();
+      }
     });
   }
 

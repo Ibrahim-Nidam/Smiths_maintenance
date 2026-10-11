@@ -14,7 +14,7 @@ export async function signIn(email, password) {
 
 export async function signOut() {
   await supabase.auth.signOut();
-  window.location.href = 'index.html';
+  window.location.replace('index.html');
 }
 
 export async function getSession() {
@@ -66,10 +66,14 @@ export async function updateSelfProfile({ fullName, email, password }) {
 export async function requireAuth(allowedRoles = null) {
   const profile = await getProfile().catch(() => null);
   if (!profile || !profile.active) {
-    window.location.href = 'index.html';
+    sessionStorage.setItem(
+      'smiths_auth_message',
+      profile ? 'Your account has been deactivated. Contact an administrator.' : 'Your account profile could not be found.'
+    );
+    await supabase.auth.signOut();
+    window.location.replace('index.html');
     return null;
   }
   if (allowedRoles && !allowedRoles.includes(profile.role)) return null;
   return profile;
 }
-

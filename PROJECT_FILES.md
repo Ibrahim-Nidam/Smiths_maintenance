@@ -41,3 +41,5 @@ Version: v1.1. Updated files are sent individually with their full path; replace
 | `sql/004_seed.sql` | Machine types and teams seed | ready |
 | `sql/005_auth_trigger.sql` | Profile auto-creation trigger on signup | ready |
 | `sql/006_updates.sql` | Installed unit details RPC function | ready |
+| `sql/007_stock_management.sql` | Stock editing, archival and DOA tracking | ready |
+| `sql/008_multi_template_parts.sql` | Add parts to selected machine type templates | ready |

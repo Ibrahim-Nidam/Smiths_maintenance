@@ -38,22 +38,35 @@
     </form>
   </div>
   <script type="module">
-    import { signIn, getSession } from './js/auth.js';
+    import { signIn, getSession, getProfile } from './js/auth.js';
     import { initThemeToggle } from './js/components/theme-toggle.js';
 
     initThemeToggle('theme-toggle-btn');
 
-    if (await getSession()) window.location.href = 'app.html';
     const form = document.getElementById('login-form');
     const btn = document.getElementById('login');
     const err = document.getElementById('error');
+    const authMessage = sessionStorage.getItem('smiths_auth_message');
+    if (authMessage) {
+      err.textContent = authMessage;
+      sessionStorage.removeItem('smiths_auth_message');
+    }
+
+    const session = await getSession();
+    if (session) {
+      const profile = await getProfile().catch(() => null);
+      if (profile?.active) {
+        window.location.replace('app.html');
+      }
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.textContent = '';
       btn.disabled = true;
       try {
         await signIn(form.email.value.trim(), form.password.value);
-        window.location.href = 'app.html';
+        window.location.replace('app.html');
       } catch (ex) {
         err.textContent = ex.message || 'Could not sign in. Check your email and password.';
         btn.disabled = false;

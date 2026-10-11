@@ -2,10 +2,15 @@ import {
   listStockItems,
   listSerializedUnits,
   createStockItem,
+  updateStockItem,
+  deleteStockItem,
   adjustStock,
   addSerializedUnitToStock,
+  setPartDoa,
+  deleteSerializedUnit,
   listStockMovements,
 } from '../api/stock.js';
+import { updateSlotInstance } from '../api/parts.js';
 import { listMachineTypes, listTypeTemplates } from '../api/machines.js';
 import { pageHeader, emptyState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
@@ -52,6 +57,13 @@ export async function render(container, params, ctx) {
           return;
         }
 
+        const groupedUnits = Object.values(units.reduce((groups, unit) => {
+          const key = unit.part_number || 'Uncategorized';
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(unit);
+          return groups;
+        }, {}));
+
         contentEl.innerHTML = `
           <div class="mb-4">
             <input type="search" id="search-unit" class="input w-64" placeholder="Filter by part or serial #...">
@@ -61,38 +73,52 @@ export async function render(container, params, ctx) {
               <thead>
                 <tr>
                   <th>Part Number</th>
-                  <th>Serial Number</th>
-                  <th>Status</th>
-                  <th>RMA Tag</th>
-                  <th>Location / Storage</th>
-                  <th>Notes</th>
+                  <th>Units</th>
+                  <th>Installed</th>
+                  <th>DOA</th>
+                  <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${units.map(u => `
-                  <tr>
-                    <td class="mono font-semibold">${esc(u.part_number)}</td>
-                    <td class="mono font-semibold text-gray-900">${esc(u.serial_number)}</td>
-                    <td>
-                      <span class="badge ${u.status === 'installed' ? 'badge-accent' : (u.status === 'available' ? 'badge-solid bg-green-700' : 'badge')}">
-                        ${esc(u.status)}
-                      </span>
-                    </td>
-                    <td>
-                      ${u.rma_tagged
-                        ? '<span class="badge badge-alert font-bold">RMA Tagged</span>'
-                        : '<span class="text-gray-400 text-sm">—</span>'
-                      }
-                    </td>
-                    <td>
-                      ${u.location === 'machine' && u.machine_code
-                        ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="font-mono text-accent hover:underline">${esc(u.machine_code)} (Pos ${u.position})</a>`
-                        : `<span class="capitalize text-sm font-medium text-gray-700">${esc(u.location)}</span>`
-                      }
-                    </td>
-                    <td class="text-sm text-gray-500">${esc(u.notes || '—')}</td>
-                  </tr>
-                `).join('')}
+                ${groupedUnits.map((group, index) => {
+                  const partNumber = group[0].part_number || 'Uncategorized';
+                  const installed = group.filter(u => u.status === 'installed').length;
+                  const doa = group.filter(u => u.doa).length;
+                  return `
+                    <tr class="stock-group-row" data-group="${index}">
+                      <td class="mono">${esc(partNumber)}</td>
+                      <td>${group.length}</td>
+                      <td>${installed}</td>
+                      <td>${doa ? `<span class="badge badge-alert">${doa} DOA</span>` : '<span class="text-muted">—</span>'}</td>
+                      <td class="text-right"><button class="btn btn-secondary btn-sm toggle-group" data-group="${index}" aria-expanded="false">Show units</button></td>
+                    </tr>
+                    <tr class="stock-group-details" data-group-details="${index}" hidden>
+                      <td colspan="5">
+                        <div class="stock-unit-list">
+                          ${group.map(u => `
+                            <div class="stock-unit-row">
+                              <div>
+                                <span class="mono">${esc(u.serial_number)}</span>
+                                ${u.doa ? '<span class="badge badge-alert ml-2">DOA</span>' : ''}
+                              </div>
+                              <span class="text-sm text-secondary">
+                                ${u.location === 'machine' && u.machine_code
+                                  ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="text-accent">${esc(u.machine_code)} (Pos ${u.position})</a>`
+                                  : esc(u.display_location || u.location || '—')}
+                              </span>
+                              <span class="text-sm text-secondary">${esc(u.notes || 'No notes')}</span>
+                              ${isGlobal ? `<div class="flex gap-2 justify-end">
+                                <button class="btn btn-ghost btn-sm edit-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}" data-notes="${esc(u.notes || '')}" data-doa="${u.doa ? 'true' : 'false'}">Edit</button>
+                                <button class="btn btn-ghost btn-sm doa-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}" data-doa="${u.doa ? 'false' : 'true'}">${u.doa ? 'Clear DOA' : 'Mark DOA'}</button>
+                                <button class="btn btn-ghost btn-sm btn-danger delete-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}">Delete</button>
+                              </div>` : ''}
+                            </div>
+                          `).join('')}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
               </tbody>
             </table>
           </div>
@@ -101,10 +127,39 @@ export async function render(container, params, ctx) {
         const searchInput = contentEl.querySelector('#search-unit');
         searchInput.addEventListener('input', () => {
           const q = searchInput.value.toLowerCase();
-          contentEl.querySelectorAll('#units-table tbody tr').forEach(tr => {
-            const text = tr.textContent.toLowerCase();
-            tr.style.display = text.includes(q) ? '' : 'none';
+          contentEl.querySelectorAll('.stock-group-row').forEach(row => {
+            const details = contentEl.querySelector(`[data-group-details="${row.dataset.group}"]`);
+            const matches = row.textContent.toLowerCase().includes(q) ||
+              (details && details.textContent.toLowerCase().includes(q));
+            row.style.display = matches ? '' : 'none';
+            if (!q) details.hidden = true;
+            else details.hidden = !matches;
           });
+        });
+        contentEl.querySelectorAll('.toggle-group').forEach(button => {
+          button.addEventListener('click', () => {
+            const details = contentEl.querySelector(`[data-group-details="${button.dataset.group}"]`);
+            details.hidden = !details.hidden;
+            button.textContent = details.hidden ? 'Show units' : 'Hide units';
+            button.setAttribute('aria-expanded', String(!details.hidden));
+          });
+        });
+        contentEl.querySelectorAll('.edit-unit-btn').forEach(button => {
+          button.addEventListener('click', () => handleEditUnit(button.dataset));
+        });
+        contentEl.querySelectorAll('.doa-unit-btn').forEach(button => {
+          button.addEventListener('click', async () => {
+            try {
+              await setPartDoa({ instanceId: button.dataset.id, doa: button.dataset.doa === 'true' });
+              toast(button.dataset.doa === 'true' ? `Unit ${button.dataset.serial} marked DOA.` : `DOA cleared for ${button.dataset.serial}.`);
+              await renderTab();
+            } catch (err) {
+              toast(err.message, 'error');
+            }
+          });
+        });
+        contentEl.querySelectorAll('.delete-unit-btn').forEach(button => {
+          button.addEventListener('click', () => handleDeleteUnit(button.dataset.id, button.dataset.serial));
         });
 
       } else if (activeTab === 'non_serialized' || activeTab === 'consumable') {
@@ -132,17 +187,19 @@ export async function render(container, params, ctx) {
                   const isLow = parseFloat(it.quantity) <= parseFloat(it.min_quantity);
                   return `
                     <tr class="${isLow ? 'bg-amber-50/50' : ''}">
-                      <td class="font-semibold">
+                      <td>
                         ${esc(it.name)}
                         ${isLow ? ' <span class="badge badge-alert text-[11px] ml-2">Low Stock</span>' : ''}
                       </td>
                       <td class="mono">${esc(it.part_number || '—')}</td>
-                      <td class="mono font-bold text-base ${isLow ? 'text-amber-700' : ''}">${it.quantity} ${esc(it.unit)}</td>
-                      <td class="mono text-gray-500">${it.min_quantity} ${esc(it.unit)}</td>
-                      <td class="text-sm text-gray-600">${esc(it.location || '—')}</td>
+                      <td class="mono text-base ${isLow ? 'text-amber-700' : ''}">${it.quantity} ${esc(it.unit)}</td>
+                      <td class="mono text-secondary">${it.min_quantity} ${esc(it.unit)}</td>
+                      <td class="text-sm text-secondary">${esc(it.location || '—')}</td>
                       ${isGlobal ? `
                         <td class="text-right">
                           <button class="btn btn-ghost btn-sm adjust-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}" data-qty="${it.quantity}">Adjust Qty</button>
+                          <button class="btn btn-ghost btn-sm edit-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-pn="${esc(it.part_number || '')}" data-unit="${esc(it.unit)}" data-min="${it.min_quantity}" data-location="${esc(it.location || '')}">Edit</button>
+                          <button class="btn btn-ghost btn-sm btn-danger delete-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}">Delete</button>
                         </td>
                       ` : ''}
                     </tr>
@@ -160,6 +217,12 @@ export async function render(container, params, ctx) {
               name: btn.dataset.name,
               unit: btn.dataset.unit,
               currentQty: btn.dataset.qty,
+            });
+            contentEl.querySelectorAll('.edit-stock-btn').forEach(btn => {
+              btn.addEventListener('click', () => handleEditStockItem(btn.dataset));
+            });
+            contentEl.querySelectorAll('.delete-stock-btn').forEach(btn => {
+              btn.addEventListener('click', () => handleDeleteStockItem(btn.dataset.id, btn.dataset.name));
             });
           });
         });
@@ -209,6 +272,111 @@ export async function render(container, params, ctx) {
     } catch (err) {
       contentEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Error loading stock tab: ${esc(err.message)}</div>`;
     }
+  }
+
+  function handleEditUnit(unit) {
+    openModal({
+      title: `Edit Unit ${unit.serial}`,
+      contentHtml: `
+        <div class="field">
+          <label class="label" for="unit-serial">Serial Number *</label>
+          <input class="input font-mono" id="unit-serial" name="serial" value="${unit.serial}" required>
+        </div>
+        <div class="field">
+          <label class="label" for="unit-notes">Notes</label>
+          <textarea class="textarea" id="unit-notes" name="notes">${unit.notes || ''}</textarea>
+        </div>
+        <p class="error-text"></p>
+      `,
+      onSubmit: async (form, close) => {
+        await updateSlotInstance({
+          instanceId: unit.id,
+          serialNumber: form.serial.value,
+          notes: form.notes.value,
+        });
+        close();
+        toast(`Unit ${form.serial.value} updated.`);
+        await renderTab();
+      },
+    });
+  }
+
+  function handleDeleteUnit(instanceId, serial) {
+    openModal({
+      title: `Delete Unit ${serial}?`,
+      danger: true,
+      submitText: 'Delete Unit',
+      contentHtml: `
+        <p>This removes the unit from active stock. Its historical movements will remain preserved.</p>
+        <p class="error-text"></p>
+      `,
+      onSubmit: async (form, close) => {
+        await deleteSerializedUnit(instanceId);
+        close();
+        toast(`Unit ${serial} removed from active stock.`);
+        await renderTab();
+      },
+    });
+  }
+
+  function handleEditStockItem(item) {
+    openModal({
+      title: `Edit ${item.name}`,
+      contentHtml: `
+        <div class="field">
+          <label class="label" for="edit-stock-name">Item Name *</label>
+          <input class="input" id="edit-stock-name" name="name" value="${item.name}" required>
+        </div>
+        <div class="field">
+          <label class="label" for="edit-stock-pn">Part Number</label>
+          <input class="input font-mono" id="edit-stock-pn" name="partNumber" value="${item.pn}">
+        </div>
+        <div class="field">
+          <label class="label" for="edit-stock-unit">Unit</label>
+          <input class="input" id="edit-stock-unit" name="unit" value="${item.unit || 'pcs'}">
+        </div>
+        <div class="field">
+          <label class="label" for="edit-stock-min">Minimum Warning Threshold</label>
+          <input class="input" id="edit-stock-min" name="minQuantity" type="number" min="0" step="any" value="${item.min || 0}">
+        </div>
+        <div class="field">
+          <label class="label" for="edit-stock-location">Storage Location</label>
+          <input class="input" id="edit-stock-location" name="location" value="${item.location || ''}">
+        </div>
+        <p class="error-text"></p>
+      `,
+      onSubmit: async (form, close) => {
+        await updateStockItem({
+          itemId: item.id,
+          name: form.name.value,
+          partNumber: form.partNumber.value,
+          unit: form.unit.value,
+          minQuantity: form.minQuantity.value,
+          location: form.location.value,
+        });
+        close();
+        toast(`"${form.name.value}" updated.`);
+        await renderTab();
+      },
+    });
+  }
+
+  function handleDeleteStockItem(itemId, name) {
+    openModal({
+      title: `Delete ${name}?`,
+      danger: true,
+      submitText: 'Delete Part',
+      contentHtml: `
+        <p>This removes the part from the active stock list. Existing stock movements remain preserved for audit history.</p>
+        <p class="error-text"></p>
+      `,
+      onSubmit: async (form, close) => {
+        await deleteStockItem(itemId);
+        close();
+        toast(`"${name}" removed from active stock.`);
+        await renderTab();
+      },
+    });
   }
 
   async function handleAddStock() {
