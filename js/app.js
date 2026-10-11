@@ -2,9 +2,12 @@ import { requireAuth, signOut, ROLES } from './auth.js';
 import { startRouter } from './router.js';
 import { openProfileModal } from './components/profile-modal.js';
 import { initThemeToggle } from './components/theme-toggle.js';
+import { initInputEnhancements, initCopyButtons } from './components/input-enhancements.js';
 
 // Initialize theme toggle
 initThemeToggle('theme-toggle-btn');
+initInputEnhancements();
+initCopyButtons();
 
 const NAV = [
   { href: '#/dashboard', label: 'Dashboard', roles: null },

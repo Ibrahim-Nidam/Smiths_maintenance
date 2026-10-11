@@ -28,9 +28,9 @@ export async function render(container, params, ctx) {
     : '';
 
   container.innerHTML = pageHeader('Machines', 'Manage physical machines, positions and serial numbers.', actions) + `
-    <div class="flex flex-wrap gap-4 mb-6 items-center justify-between">
-      <div class="flex flex-wrap gap-3 items-center flex-1 max-w-2xl">
-        <input type="search" id="search-code" class="input w-48" placeholder="Search by code...">
+    <div class="machine-filters mb-6">
+      <div class="machine-filter-row">
+        <input type="search" id="search-code" class="input machine-search" placeholder="Search by code...">
         <select id="filter-type" class="select w-40">
           <option value="">All Types</option>
         </select>

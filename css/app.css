@@ -379,6 +379,120 @@ a {
   background-color: var(--paper);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
+
+.clearable-input {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+}
+
+.clearable-input > .input {
+  padding-right: 38px;
+  width: 100%;
+}
+
+.clear-input-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--g500);
+  font: 400 20px/1 var(--font);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.clear-input-btn:hover,
+.clear-input-btn:focus-visible {
+  color: var(--ink);
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border: 1px solid var(--g200);
+  background: var(--paper);
+  color: var(--g700);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.copy-btn svg,
+.clear-input-btn svg,
+.password-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 34px;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--g500);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.clearable-input:has(.password-toggle-btn) > .input {
+  padding-right: 66px;
+}
+
+.copy-btn:hover,
+.copy-btn.copied {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.machine-filters {
+  display: flex;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.machine-filter-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.machine-search {
+  min-width: 0;
+}
+
+.stock-search-row,
+.history-filters {
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+.stock-unit-row > * {
+  min-width: 0;
+}
+
+.stock-unit-row .copy-btn,
+.slot-serial .copy-btn {
+  flex: 0 0 auto;
+}
 .textarea {
   height: auto;
   min-height: 96px;
@@ -392,11 +506,11 @@ a {
 
 .hint {
   font-size: 13px;
-  color: #52525b;
+  color: #3f3f46;
 }
 
 .text-secondary {
-  color: #52525b;
+  color: #3f3f46;
 }
 
 [data-theme="dark"] .text-secondary {
@@ -742,20 +856,46 @@ a {
   color: var(--g500) !important;
 }
 
-[data-theme="light"] .text-gray-500 {
-  color: #52525b !important;
+html[data-theme="light"] .text-gray-500,
+html[data-theme="light"] .text-gray-400 {
+  color: #27272a !important;
 }
 
-[data-theme="light"] .text-gray-600 {
-  color: #3f3f46 !important;
+html[data-theme="light"] .text-gray-600,
+html[data-theme="light"] .text-gray-700 {
+  color: #18181b !important;
 }
 
-[data-theme="light"] .text-accent {
+html[data-theme="light"] .text-gray-800,
+html[data-theme="light"] .text-gray-900 {
+  color: #090d16 !important;
+}
+
+html[data-theme="light"] .panel h2,
+html[data-theme="light"] .panel h3,
+html[data-theme="light"] .table th {
+  color: #18181b !important;
+}
+
+html[data-theme="light"] .text-accent {
   color: var(--accent-text) !important;
 }
 
-[data-theme="light"] .text-gray-400 {
-  color: #52525b !important;
+html[data-theme="light"] .text-gray-300 {
+  color: #3f3f46 !important;
+}
+
+html[data-theme="light"] .hint,
+html[data-theme="light"] .stat-label,
+html[data-theme="light"] .page-sub,
+html[data-theme="light"] .empty-text,
+html[data-theme="light"] .user-role {
+  color: #3f3f46 !important;
+}
+
+html[data-theme="light"] ::placeholder {
+  color: #52525b;
+  opacity: 1;
 }
 [data-theme="dark"] .border-gray-100,
 [data-theme="dark"] .border-gray-200 {
@@ -828,11 +968,20 @@ a {
   .page {
     padding: 24px 16px 64px;
   }
+
+  .machine-filter-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     animation: none !important;
+  }
+
+  /* The interface uses square controls and panels for a denser professional layout. */
+  html body *, html body *::before, html body *::after {
+    border-radius: 0 !important;
   }
 }

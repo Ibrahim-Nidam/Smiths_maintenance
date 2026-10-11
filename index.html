@@ -12,9 +12,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="css/app.css">
   <title>Sign in - Maintenance</title>
 </head>
 <body class="auth-body">
@@ -40,8 +40,10 @@
   <script type="module">
     import { signIn, getSession, getProfile } from './js/auth.js';
     import { initThemeToggle } from './js/components/theme-toggle.js';
+    import { initInputEnhancements } from './js/components/input-enhancements.js';
 
     initThemeToggle('theme-toggle-btn');
+    initInputEnhancements();
 
     const form = document.getElementById('login-form');
     const btn = document.getElementById('login');
