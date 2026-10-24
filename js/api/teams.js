@@ -3,13 +3,19 @@ import { supabase } from '../supabase.js';
 export async function listTeams() {
   const { data, error } = await supabase
     .from('teams')
-    .select('*, profiles(id)')
+    .select('*, profiles(id, full_name, role, active)')
     .order('name');
   if (error) throw error;
-  return data.map(t => ({
-    ...t,
-    member_count: t.profiles ? t.profiles.length : 0,
-  }));
+  return data.map(t => {
+    const members = (t.profiles || []).slice().sort((a, b) =>
+      String(a.full_name || '').localeCompare(String(b.full_name || ''))
+    );
+    return {
+      ...t,
+      members,
+      member_count: members.length,
+    };
+  });
 }
 
 export async function createTeam({ name }) {

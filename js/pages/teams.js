@@ -1,18 +1,39 @@
 import { listTeams, createTeam, updateTeam, deleteTeam } from '../api/teams.js';
-import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
+import { emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
 
-export async function render(container, params, ctx) {
+const ROLE_LABELS = {
+  [ROLES.ADMIN]: 'Admin',
+  [ROLES.MANAGER]: 'Maintenance manager',
+  [ROLES.TEAM_LEAD]: 'Team lead',
+  [ROLES.TECHNICIAN]: 'Technician',
+};
+
+const ROLE_BADGE_CLASSES = {
+  [ROLES.ADMIN]: 'badge-solid',
+  [ROLES.MANAGER]: 'badge-accent',
+  [ROLES.TEAM_LEAD]: 'badge',
+  [ROLES.TECHNICIAN]: 'badge-muted',
+};
+
+// Teams tab of the Staff page (#/staff/teams).
+export async function renderTeamsPanel(container, ctx) {
   const isGlobal = [ROLES.ADMIN, ROLES.MANAGER].includes(ctx.profile.role);
 
-  const actions = isGlobal
-    ? `<button id="btn-add-team" class="btn btn-primary btn-sm">Add team</button>`
-    : '';
-
-  container.innerHTML = pageHeader('Teams', 'Manage maintenance teams and assignments.', actions) +
-    `<div id="teams-list">${loadingState('Loading teams...')}</div>`;
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Teams</h2>
+          <p class="small muted mt-1">Maintenance teams and their member counts.</p>
+        </div>
+        ${isGlobal ? `<button id="btn-add-team" class="btn btn-primary btn-sm">Add team</button>` : ''}
+      </div>
+      <div id="teams-list">${loadingState('Loading teams...')}</div>
+    </div>
+  `;
 
   async function refresh() {
     const listEl = container.querySelector('#teams-list');
@@ -36,30 +57,60 @@ export async function render(container, params, ctx) {
               <tr>
                 <th>Team name</th>
                 <th>Members</th>
-                ${isGlobal ? '<th class="text-right">Actions</th>' : ''}
+                <th class="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${teams.map(t => `
-                <tr data-id="${t.id}">
-                  <td class="strong">${esc(t.name)}</td>
-                  <td>
-                    <span class="badge badge-accent">${t.member_count} member${t.member_count === 1 ? '' : 's'}</span>
-                  </td>
-                  ${isGlobal ? `
+              ${teams.map(t => {
+                const members = t.members || [];
+                const rows = members.length
+                  ? members.map(m => `
+                      <div class="member-row">
+                        <span class="member-name">${esc(m.full_name)}</span>
+                        <span class="badge ${ROLE_BADGE_CLASSES[m.role] || 'badge-muted'}">${ROLE_LABELS[m.role] || esc(m.role)}</span>
+                        ${m.active ? '' : '<span class="badge badge-warning">Inactive</span>'}
+                      </div>
+                    `).join('')
+                  : '<p class="small muted mb-0">No staff assigned to this team yet.</p>';
+                return `
+                  <tr data-id="${t.id}">
+                    <td class="strong">${esc(t.name)}</td>
+                    <td>
+                      <span class="badge badge-accent">${t.member_count} member${t.member_count === 1 ? '' : 's'}</span>
+                    </td>
                     <td class="text-right">
                       <div class="cell-actions">
-                        <button class="btn btn-ghost btn-sm edit-team-btn" data-id="${t.id}" data-name="${esc(t.name)}">Edit</button>
-                        <button class="btn btn-danger btn-sm delete-team-btn" data-id="${t.id}" data-name="${esc(t.name)}" ${t.member_count > 0 ? 'disabled title="Cannot delete team with active members"' : ''}>Delete</button>
+                        <button class="btn btn-ghost btn-sm toggle-team-btn" data-id="${t.id}"
+                          aria-expanded="false" aria-controls="team-members-${t.id}">Show members</button>
+                        ${isGlobal ? `
+                          <button class="btn btn-ghost btn-sm edit-team-btn" data-id="${t.id}" data-name="${esc(t.name)}">Edit</button>
+                          <button class="btn btn-danger btn-sm delete-team-btn" data-id="${t.id}" data-name="${esc(t.name)}" ${t.member_count > 0 ? 'disabled title="Cannot delete team with active members"' : ''}>Delete</button>
+                        ` : ''}
                       </div>
                     </td>
-                  ` : ''}
-                </tr>
-              `).join('')}
+                  </tr>
+                  <tr class="group-details" id="team-members-${t.id}" hidden>
+                    <td colspan="3">
+                      <div class="group-details-head">Members of ${esc(t.name)}</div>
+                      <div class="members-list">${rows}</div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
       `;
+
+      listEl.querySelectorAll('.toggle-team-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const details = listEl.querySelector(`#team-members-${btn.dataset.id}`);
+          if (!details) return;
+          details.hidden = !details.hidden;
+          btn.setAttribute('aria-expanded', String(!details.hidden));
+          btn.textContent = details.hidden ? 'Show members' : 'Hide members';
+        });
+      });
 
       listEl.querySelectorAll('.edit-team-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -90,7 +141,7 @@ export async function render(container, params, ctx) {
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Create Team',
+      submitText: 'Create team',
       onSubmit: async (form, close) => {
         const name = form.name.value;
         await createTeam({ name });
@@ -111,7 +162,7 @@ export async function render(container, params, ctx) {
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Save Changes',
+      submitText: 'Save changes',
       onSubmit: async (form, close) => {
         const name = form.name.value;
         await updateTeam(team.id, { name });
