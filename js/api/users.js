@@ -32,6 +32,32 @@ async function checkTeamLeadLimit(teamId, userId = null) {
   }
 }
 
+// Sign-in address of every account, keyed by profile id.
+// Requires sql/012_login_and_accounts.sql; returns {} while it is missing, so the
+// Staff page simply shows no email instead of failing.
+export async function listAccountEmails() {
+  const { data, error } = await supabase.rpc('list_account_emails');
+  if (error) return {};
+  const byUser = {};
+  (data || []).forEach(row => { byUser[row.user_id] = row.email || ''; });
+  return byUser;
+}
+
+export async function updateUserEmail(userId, email) {
+  const { error } = await supabase.rpc('update_user_email', {
+    p_user_id: userId,
+    p_new_email: email,
+  });
+  if (error) {
+    const message = String(error.message || '');
+    throw new Error(
+      /could not find the function|does not exist/i.test(message)
+        ? 'Changing an email address needs sql/012_login_and_accounts.sql to be run in the Supabase SQL editor.'
+        : message
+    );
+  }
+}
+
 export async function resetUserPassword(userId, newPassword = 'Smiths2026!') {
   const { error } = await supabase.rpc('reset_user_password', {
     p_user_id: userId,

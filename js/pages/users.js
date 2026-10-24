@@ -1,9 +1,26 @@
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword } from '../api/users.js';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listAccountEmails, updateUserEmail } from '../api/users.js';
 import { listTeams } from '../api/teams.js';
-import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
+import { emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
+
+// New accounts get first.lastname@DOMAIN, generated from the full name.
+// The admin can still adjust the address before creating the account.
+const EMAIL_DOMAIN = 'traser.ma';
+
+export function suggestEmail(fullName) {
+  const clean = String(fullName || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const tokens = clean.split(/[^a-z0-9]+/).filter(Boolean);
+  if (!tokens.length) return '';
+  const first = tokens[0];
+  const last = tokens[tokens.length - 1];
+  const local = last && last !== first ? `${first}.${last}` : first;
+  return `${local}@${EMAIL_DOMAIN}`;
+}
 
 const ROLE_LABELS = {
   [ROLES.ADMIN]: 'Admin',
@@ -19,21 +36,38 @@ const ROLE_BADGE_CLASSES = {
   [ROLES.TECHNICIAN]: 'badge-muted',
 };
 
-export async function render(container, params, ctx) {
+// Users tab of the Staff page (#/staff).
+export async function renderUsersPanel(container, ctx) {
   const isAdmin = ctx.profile.role === ROLES.ADMIN;
   const canManage = isAdmin || ctx.profile.role === ROLES.MANAGER;
 
-  const actions = canManage
-    ? `<button id="btn-add-user" class="btn btn-primary btn-sm">Create user</button>`
-    : '';
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Users</h2>
+          <p class="small muted mt-1">User accounts, roles and team assignments.</p>
+        </div>
+        ${canManage ? `<button id="btn-add-user" class="btn btn-primary btn-sm">Create user</button>` : ''}
+      </div>
+      <div id="users-list">${loadingState('Loading users...')}</div>
+    </div>
+  `;
 
-  container.innerHTML = pageHeader('Users', 'Manage user accounts, roles and team assignments.', actions) +
-    `<div id="users-list">${loadingState('Loading users...')}</div>`;
+  // Data refreshed together on every change.
+  let rawUsers = [];
+  let teams = [];
+  // Sign-in addresses, loaded with the users (empty until sql/012 is applied).
+  let emails = {};
 
   async function refresh() {
     const listEl = container.querySelector('#users-list');
     try {
-      let [rawUsers, teams] = await Promise.all([listUsers(), listTeams().catch(() => [])]);
+      [rawUsers, teams, emails] = await Promise.all([
+        listUsers(),
+        listTeams().catch(() => []),
+        listAccountEmails(),
+      ]);
 
       // Non-admins must NOT see Admin users in the list
       const users = isAdmin ? rawUsers : rawUsers.filter(u => u.role !== ROLES.ADMIN);
@@ -42,7 +76,7 @@ export async function render(container, params, ctx) {
         listEl.innerHTML = emptyState(
           'No users found',
           'Create user accounts to give technicians and leads access.',
-          canManage ? `<button id="btn-add-user-empty" class="btn btn-primary btn-sm">+ Create first user</button>` : ''
+          canManage ? `<button id="btn-add-user-empty" class="btn btn-primary btn-sm">Create first user</button>` : ''
         );
         const emptyBtn = listEl.querySelector('#btn-add-user-empty');
         if (emptyBtn) emptyBtn.addEventListener('click', () => handleAddUser(teams));
@@ -50,11 +84,18 @@ export async function render(container, params, ctx) {
       }
 
       listEl.innerHTML = `
+        <div class="filter-row">
+          <div class="search-field">
+            <input type="search" id="user-search" class="input" placeholder="Filter users by name, email, role or team" autocomplete="off">
+          </div>
+          <span class="small muted" id="user-count">${users.length} user${users.length === 1 ? '' : 's'}</span>
+        </div>
         <div class="table-wrap">
           <table class="table">
             <thead>
               <tr>
                 <th>Full name</th>
+                <th>Sign-in email</th>
                 <th>Role</th>
                 <th>Team</th>
                 <th>Status</th>
@@ -70,6 +111,7 @@ export async function render(container, params, ctx) {
                       ${esc(u.full_name)}
                       ${isSelf ? ' <span class="small muted">(you)</span>' : ''}
                     </td>
+                    <td class="secondary">${emails[u.id] ? esc(emails[u.id]) : '<span class="muted">&mdash;</span>'}</td>
                     <td>
                       <span class="badge ${ROLE_BADGE_CLASSES[u.role] || ''}">
                         ${esc(ROLE_LABELS[u.role] || u.role)}
@@ -118,6 +160,21 @@ export async function render(container, params, ctx) {
           </table>
         </div>
       `;
+
+      const searchEl = listEl.querySelector('#user-search');
+      const countEl = listEl.querySelector('#user-count');
+      if (searchEl) {
+        searchEl.addEventListener('input', () => {
+          const term = searchEl.value.trim().toLowerCase();
+          let shown = 0;
+          listEl.querySelectorAll('tbody tr').forEach(row => {
+            const matches = !term || row.textContent.toLowerCase().includes(term);
+            row.style.display = matches ? '' : 'none';
+            if (matches) shown += 1;
+          });
+          if (countEl) countEl.textContent = `${shown} user${shown === 1 ? '' : 's'}`;
+        });
+      }
 
       // Active status inline toggle listener
       if (canManage) {
@@ -185,17 +242,18 @@ export async function render(container, params, ctx) {
           <p class="alert-text">The default password for new accounts is <code>Smiths2026!</code>. The user can change it from their profile after signing in.</p>
         </div>
         <div class="field">
-          <label class="label" for="user-email">Email address *</label>
-          <input class="input" id="user-email" name="email" type="email" required placeholder="technician@company.com">
+          <label class="label" for="user-name">Full name *</label>
+          <input class="input" id="user-name" name="fullName" required placeholder="John Doe" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="label" for="user-email">Sign-in email *</label>
+          <input class="input" id="user-email" name="email" type="email" required placeholder="john.doe@${EMAIL_DOMAIN}" autocomplete="off">
+          <span class="hint">Generated from the full name as first.lastname@${EMAIL_DOMAIN}. Edit it before creating the account if needed.</span>
         </div>
         <div class="field">
           <label class="label" for="user-pass">Initial password *</label>
           <input class="input" id="user-pass" name="password" type="text" required value="Smiths2026!">
           <span class="hint">Kept as the default password if unchanged.</span>
-        </div>
-        <div class="field">
-          <label class="label" for="user-name">Full name *</label>
-          <input class="input" id="user-name" name="fullName" required placeholder="John Doe">
         </div>
         <div class="field">
           <label class="label" for="user-role">Role *</label>
@@ -213,6 +271,19 @@ export async function render(container, params, ctx) {
         <p class="error-text"></p>
       `,
       submitText: 'Create account',
+      onOpen: modal => {
+        const nameInput = modal.querySelector('#user-name');
+        const emailInput = modal.querySelector('#user-email');
+        let emailEdited = false;
+
+        emailInput.value = suggestEmail(nameInput.value);
+        emailInput.addEventListener('input', () => { emailEdited = true; });
+        nameInput.addEventListener('input', () => {
+          if (emailEdited) return;
+          const suggestion = suggestEmail(nameInput.value);
+          if (suggestion) emailInput.value = suggestion;
+        });
+      },
       onSubmit: async (form, close) => {
         const email = form.email.value.trim();
         const password = form.password.value || 'Smiths2026!';
@@ -232,6 +303,7 @@ export async function render(container, params, ctx) {
 
   function handleEditUser(user, teams) {
     const isSelf = user.id === ctx.profile.id;
+    const hasEmail = emails[user.id] !== undefined;
 
     const roleOptions = `
       <option value="${ROLES.TECHNICIAN}" ${user.role === ROLES.TECHNICIAN ? 'selected' : ''}>Technician</option>
@@ -246,6 +318,14 @@ export async function render(container, params, ctx) {
         <div class="field">
           <label class="label" for="user-name">Full name *</label>
           <input class="input" id="user-name" name="fullName" required value="${esc(user.fullName)}">
+        </div>
+        <div class="field">
+          <label class="label" for="user-email">Sign-in email *</label>
+          ${hasEmail
+            ? `<input class="input" id="user-email" name="email" type="email" required value="${esc(emails[user.id] || '')}" autocomplete="off">
+               <span class="hint">The address used to sign in (with the password or the full name).</span>`
+            : `<input class="input" id="user-email" name="email" disabled placeholder="Not available yet">
+               <span class="hint">Run sql/012_login_and_accounts.sql in the Supabase SQL editor to manage email addresses.</span>`}
         </div>
         <div class="field">
           <label class="label" for="user-role">Role *</label>
@@ -274,6 +354,11 @@ export async function render(container, params, ctx) {
         const role = form.role ? form.role.value : user.role;
         const teamId = form.teamId.value;
         const active = form.active ? form.active.checked : user.active;
+        const newEmail = hasEmail && form.email ? form.email.value.trim() : '';
+
+        if (newEmail && newEmail.toLowerCase() !== String(emails[user.id] || '').toLowerCase()) {
+          await updateUserEmail(user.id, newEmail);
+        }
 
         await updateUser(user.id, { fullName, role, teamId, active }, ctx.profile.role);
         toast(`Profile for "${fullName}" updated.`);
@@ -329,4 +414,3 @@ export async function render(container, params, ctx) {
 
   await refresh();
 }
-

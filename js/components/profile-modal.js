@@ -27,7 +27,8 @@ export async function openProfileModal(profile, onUpdateSuccess = null) {
       </div>
       <div class="field">
         <label class="label" for="profile-email">Email address *</label>
-        <input class="input" id="profile-email" name="email" type="email" required value="${esc(currentEmail)}">
+        <input class="input" id="profile-email" name="email" type="email" required value="${esc(currentEmail)}" autocomplete="off">
+        <span class="hint">The address you sign in with. You can also sign in with your full name.</span>
       </div>
       <hr>
       <h4 class="small strong mb-2">Change password</h4>
