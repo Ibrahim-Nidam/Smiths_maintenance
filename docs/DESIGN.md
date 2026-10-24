@@ -12,7 +12,7 @@ Direction: neutral slate surfaces, one steel-blue accent, semantic status colors
 
 ## Typography
 
-- Fonts: IBM Plex Sans for the interface, IBM Plex Mono only for part numbers, serial numbers and codes.
+- Fonts: IBM Plex Sans for the interface, IBM Plex Mono only for part numbers, serial numbers and codes. Mono identifiers are never bold (normal weight), bold is reserved for labels and names.
 - 16px base text (also applied to inputs on phones so iOS does not zoom), 13px secondary text, 12px captions.
 
 ## Shape and depth

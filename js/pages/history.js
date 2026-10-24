@@ -171,8 +171,8 @@ export async function render(container, params, ctx) {
                   </td>
                   <td>${ev.position ? `<span class="mono secondary">Pos ${ev.position}</span>` : '<span class="muted">&mdash;</span>'}</td>
                   <td class="mono tiny break-all">
-                    ${oldSn ? `<div class="text-danger strong">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
-                    ${newSn ? `<div class="text-success strong">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
+                    ${oldSn ? `<div class="text-danger mono">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                    ${newSn ? `<div class="text-success mono">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
                     ${!oldSn && !newSn ? '<span class="muted">&mdash;</span>' : ''}
                   </td>
                   <td class="small strong">${esc(userName)}</td>
