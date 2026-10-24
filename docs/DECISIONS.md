@@ -12,3 +12,14 @@
 - Users never write data tables directly. Changes go through RPC functions that re-check role and team; reads are limited by RLS.
 - No migration of data from the old CTX 9800 tracker.
 - History and stock movements are append-only; corrections use a `correction` event.
+- Part numbers and serial numbers are shown in mono at normal weight; bold is reserved for labels and names.
+- Parts catalogue (`parts_catalog`) is reference data: part number + designation, read by everyone, written only by admins and maintenance managers through RPC. It is seeded from `docs/Unique_Parts_PN_list.xlsx`. Each entry can also record the machine types it fits (several), its module and whether units are serialized; empty/null means "not classified yet".
+- User accounts and teams live on one Staff page (`#/staff`) with two tabs; `#/users`, `#/teams` and `#/people` redirect there.
+- Sign-in accepts an email address or the full name. A value without `@` is resolved by `resolve_login_email` (sql/012), which only matches full names and never answers for email addresses, so addresses cannot be probed through it.
+- Account emails are not stored in `profiles`: they live in `auth.users` and are read through `list_account_emails` and changed through `update_user_email` (admins and maintenance managers for anyone, a user for their own address). New accounts get `first.lastname@traser.ma` generated from the full name, editable before the account is created.
+- The stock form starts from the part: picking one from the catalogue fills the machine type, the serialization, the part number and the item name, and the part list follows the stock category (serialized tab / other tabs).
+- Stock has no unit input: everything is counted in pieces, so items are always stored with the API default unit (`pcs`).
+- The minimum warning threshold belongs to consumables only. Non-serialized parts and serialized units never carry one, and the stock list shows an em dash instead of a threshold of 0.
+- Adding serialized units is quantity-driven: the quantity renders that many serial number fields (capped at 50, capped amount reported afterwards), every field is required and unique, and a partial failure reports exactly which serials were added and which failed.
+- The stock table only offers "Tag RMA" / "Untag RMA" on serialized units, next to "Mark DOA". It calls the same `set_rma_tag` RPC as the RMA page, so a tagged unit immediately appears under RMA Defective Units.
+- Teams rows expand to list their members (name, role, inactive flag) using the `profiles` embed already returned by `listTeams()`; no extra request and no new RPC.
