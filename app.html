@@ -12,15 +12,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="js/tailwind-config.js"></script>
   <link rel="stylesheet" href="css/app.css">
   <title>Maintenance</title>
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="#/dashboard"><span class="brand-mark"></span>Maintenance</a>
+      <a class="brand" href="#/dashboard"><span class="brand-mark" aria-hidden="true"></span>Maintenance</a>
       <nav id="nav" class="nav" aria-label="Main"></nav>
       <div class="topbar-right">
         <button id="theme-toggle-btn" class="theme-toggle-btn" type="button"></button>
@@ -30,7 +28,7 @@
         </button>
         <button id="logout" class="btn btn-ghost btn-sm" type="button">Sign out</button>
         <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Menu" aria-expanded="false">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
         </button>
       </div>
     </div>

@@ -12,10 +12,7 @@ function addClearButton(input) {
   if (!isClearable(input)) return;
 
   const wrapper = document.createElement('span');
-  const layoutClasses = [...input.classList]
-    .filter(className => className === 'flex-1' || className === 'w-full' || className.startsWith('w-'))
-    .join(' ');
-  wrapper.className = `clearable-input ${layoutClasses}`.trim();
+  wrapper.className = 'clearable-input';
   input.parentNode.insertBefore(wrapper, input);
   wrapper.appendChild(input);
 
@@ -24,7 +21,7 @@ function addClearButton(input) {
   button.className = 'clear-input-btn';
   button.setAttribute('aria-label', 'Clear field');
   button.title = 'Clear field';
-  button.textContent = '×';
+  button.innerHTML = clearIcon();
   wrapper.appendChild(button);
 
   if (input.type === 'password') {
@@ -111,6 +108,10 @@ export function copyButton(value, label = 'Copy') {
 
 function copyIcon() {
   return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="1"></rect><path d="M6 15H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"></path></svg>';
+}
+
+function clearIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>';
 }
 
 function checkIcon() {

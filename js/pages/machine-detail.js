@@ -1,17 +1,17 @@
 import { getMachineByCode, updateMachine, deleteMachine, listMachineTypes, listTemplatePartAvailability } from '../api/machines.js';
 import { addPartToMachine, updateMachinePart, deleteMachinePart, setSlotSerial, updateSlotInstance, replaceSerializedPart, replaceNonSerializedPart, swapParts, setRmaTag } from '../api/parts.js';
 import { listMaintenanceEvents } from '../api/history.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
 import { copyButton } from '../components/input-enhancements.js';
 
 const STATUS_BADGE_CLASSES = {
-  operational: 'badge-accent',
-  degraded: 'badge-alert',
-  down: 'badge-alert font-bold',
-  decommissioned: 'badge text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400',
+  operational: 'badge-success',
+  degraded: 'badge-warning',
+  down: 'badge-danger',
+  decommissioned: 'badge-muted',
 };
 
 const STATUS_LABELS = {
@@ -42,7 +42,7 @@ export async function render(container, params, ctx) {
     return;
   }
 
-  container.innerHTML = `<div class="p-8 text-center text-gray-500 font-medium">Loading machine ${esc(machineCode)}...</div>`;
+  container.innerHTML = `<p class="loading">Loading machine ${esc(machineCode)}...</p>`;
 
   const expandedParts = new Set();
   let activeTab = 'parts';
@@ -66,20 +66,20 @@ export async function render(container, params, ctx) {
 
     const headerActions = `
       <a href="#/machines" class="btn btn-secondary btn-sm">&larr; Back</a>
-      ${canManage ? `<button id="btn-add-part" class="btn btn-secondary btn-sm">+ Add part</button>` : ''}
-      ${canManage ? `<button id="btn-edit-machine" class="btn btn-ghost btn-sm">Edit</button>` : ''}
-      ${isGlobal ? `<button id="btn-delete-machine" class="btn btn-ghost btn-sm text-red-700">Delete</button>` : ''}
+      ${canManage ? `<button id="btn-add-part" class="btn btn-primary btn-sm">Add part</button>` : ''}
+      ${canManage ? `<button id="btn-edit-machine" class="btn btn-secondary btn-sm">Edit</button>` : ''}
+      ${isGlobal ? `<button id="btn-delete-machine" class="btn btn-danger btn-sm">Delete</button>` : ''}
     `;
 
-    const subText = `${machine.type_name} &bull; ${machine.team_name} ${machine.location ? `&bull; ${esc(machine.location)}` : ''}`;
+    const subText = `${machine.type_name} &middot; ${machine.team_name} ${machine.location ? `&middot; ${esc(machine.location)}` : ''}`;
 
     container.innerHTML = `
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div class="page-header">
         <div>
-          <div class="flex items-center gap-3">
-            <h1 class="page-title font-mono font-bold">${esc(machine.code)}</h1>
+          <div class="row">
+            <h1 class="page-title mono">${esc(machine.code)}</h1>
             <span class="badge ${STATUS_BADGE_CLASSES[machine.status] || ''}">
-              ${esc(STATUS_LABELS[machine.status] || machine.status)}
+              <span class="dot"></span>${esc(STATUS_LABELS[machine.status] || machine.status)}
             </span>
           </div>
           <p class="page-sub">${subText}</p>
@@ -87,13 +87,9 @@ export async function render(container, params, ctx) {
         <div class="page-actions">${headerActions}</div>
       </div>
 
-      <div class="border-b border-gray-200 mb-6 flex gap-6">
-        <button class="view-tab-btn py-2.5 border-b-2 font-semibold text-sm ${activeTab === 'parts' ? 'text-accent border-accent' : 'text-gray-500 border-transparent hover:text-gray-900'}" data-tab="parts">
-          Modules & Installed Parts
-        </button>
-        <button class="view-tab-btn py-2.5 border-b-2 font-semibold text-sm ${activeTab === 'history' ? 'text-accent border-accent' : 'text-gray-500 border-transparent hover:text-gray-900'}" data-tab="history">
-          Machine History Log
-        </button>
+      <div class="tabs" role="tablist">
+        <button class="tab-btn view-tab-btn" type="button" role="tab" data-tab="parts" aria-selected="${activeTab === 'parts'}">Modules &amp; installed parts</button>
+        <button class="tab-btn view-tab-btn" type="button" role="tab" data-tab="history" aria-selected="${activeTab === 'history'}">Machine history log</button>
       </div>
 
       <div id="tab-content"></div>
@@ -123,7 +119,7 @@ export async function render(container, params, ctx) {
           submitText: 'Delete Machine',
           contentHtml: `
             <p>Are you sure you want to delete machine <strong>${esc(machine.code)}</strong>?</p>
-            <p class="text-sm text-gray-500 mt-2">All installed parts structure for this machine will be removed. Historical event logs will remain preserved.</p>
+            <p class="small muted mt-2">The installed parts structure for this machine will be removed. Historical event logs remain preserved.</p>
             <p class="error-text"></p>
           `,
           onSubmit: async (form, close) => {
@@ -140,7 +136,7 @@ export async function render(container, params, ctx) {
     if (editMachineBtn) {
       editMachineBtn.addEventListener('click', () => {
         openModal({
-          title: `Edit Machine Details (${machine.code})`,
+          title: `Edit machine details (${machine.code})`,
           contentHtml: `
             <div class="field">
               <label class="label" for="em-status">Status *</label>
@@ -157,7 +153,7 @@ export async function render(container, params, ctx) {
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Save Machine',
+          submitText: 'Save machine',
           onSubmit: async (form, close) => {
             const status = form.status.value;
             const location = form.location.value;
@@ -185,52 +181,56 @@ export async function render(container, params, ctx) {
         }
 
         openModal({
-          title: `Add Part to Machine ${machine.code}`,
+          title: `Add part to machine ${machine.code}`,
           contentHtml: `
             <div class="field">
               <label class="label" for="ap-module">Module *</label>
               <select class="select" id="ap-module" name="module" required>
-                <option value="input">Input Module</option>
-                <option value="scanner">Scanner Module</option>
-                <option value="output">Output Module</option>
+                <option value="input">Input module</option>
+                <option value="scanner">Scanner module</option>
+                <option value="output">Output module</option>
               </select>
             </div>
             <div class="field">
-              <label class="label" for="ap-name">Part Name *</label>
+              <label class="label" for="ap-name">Part name *</label>
               <input class="input" id="ap-name" name="name" required placeholder="e.g. Motor Drive">
             </div>
             <div class="field">
-              <label class="label" for="ap-pn">Part Number *</label>
-              <input class="input font-mono" id="ap-pn" name="partNumber" required placeholder="e.g. MOT-001" style="text-transform:uppercase">
+              <label class="label" for="ap-pn">Part number *</label>
+              <input class="input mono" id="ap-pn" name="partNumber" required placeholder="e.g. MOT-001" style="text-transform:uppercase">
             </div>
-            <div class="field flex items-center gap-3">
-              <input type="checkbox" id="ap-serialized" name="serialized" checked>
-              <label class="label mb-0 cursor-pointer" for="ap-serialized">Serialized</label>
+            <div class="field">
+              <label class="checkbox-row" for="ap-serialized">
+                <input type="checkbox" id="ap-serialized" name="serialized" checked>
+                <span class="label">Serialized</span>
+              </label>
             </div>
             <div class="field">
               <label class="label" for="ap-qty">Quantity per machine *</label>
               <input class="input" id="ap-qty" name="quantity" type="number" min="1" value="1" required>
             </div>
             <div class="field">
-              <label class="label" for="ap-placement">Placement Mode *</label>
+              <label class="label" for="ap-placement">Placement mode *</label>
               <select class="select" id="ap-placement" name="placementMode">
                 <option value="flexible">Flexible</option>
                 <option value="fixed">Fixed</option>
               </select>
             </div>
-            <div class="field flex items-center gap-3">
-              <input type="checkbox" id="ap-rma" name="rmaApplicable" checked>
-              <label class="label mb-0 cursor-pointer" for="ap-rma">RMA applicable</label>
+            <div class="field">
+              <label class="checkbox-row" for="ap-rma">
+                <input type="checkbox" id="ap-rma" name="rmaApplicable" checked>
+                <span class="label">RMA applicable</span>
+              </label>
             </div>
             ${isGlobal ? `
-              <div class="field border border-gray-200 rounded-md p-3">
-                <div class="flex items-center gap-3">
+              <div class="field-box">
+                <label class="checkbox-row" for="ap-sync-templates">
                   <input type="checkbox" id="ap-sync-templates" name="syncTemplates">
-                  <label class="label mb-0 cursor-pointer" for="ap-sync-templates">This part is also present in other machine types</label>
-                </div>
-                <div id="ap-template-types" class="hidden mt-3 space-y-2">
-                  <p class="text-xs text-gray-500">Select the other templates that should include this part. Existing definitions are shown automatically and will not be duplicated.</p>
-                  <div id="ap-template-type-list" class="space-y-2"></div>
+                  <span class="label">This part is also present in other machine types</span>
+                </label>
+                <div id="ap-template-types" class="hidden mt-3 stack-sm">
+                  <p class="tiny muted">Select the other templates that should include this part. Existing definitions are shown automatically and will not be duplicated.</p>
+                  <div id="ap-template-type-list" class="stack-sm"></div>
                 </div>
               </div>
             ` : ''}
@@ -261,13 +261,13 @@ export async function render(container, params, ctx) {
                 ? otherTypes.map(type => {
                     const alreadyPresent = existingIds.has(type.id);
                     return `
-                      <label class="flex items-center gap-2 text-sm ${alreadyPresent ? 'text-gray-500' : ''}">
+                      <label class="checkbox-row small ${alreadyPresent ? 'muted' : ''}">
                         <input type="checkbox" name="templateTypeIds" value="${type.id}" ${alreadyPresent ? 'checked disabled' : ''}>
                         <span>${esc(type.name)}${alreadyPresent ? ' (already contains this part)' : ''}</span>
                       </label>
                     `;
                   }).join('')
-                : '<p class="text-xs text-gray-500">No other machine types are available.</p>';
+                : '<p class="tiny muted">No other machine types are available.</p>';
             };
             syncCheckbox.addEventListener('change', loadTemplateTypes);
             modal.querySelector('#ap-module').addEventListener('change', loadTemplateTypes);
@@ -316,51 +316,51 @@ export async function render(container, params, ctx) {
     });
 
     tabContentEl.innerHTML = `
-      <div class="space-y-8">
+      <div class="stack-lg">
         ${MODULE_KEYS.map(modKey => {
           const parts = partsByModule[modKey];
           return `
-            <div class="panel bg-white shadow-sm border border-gray-200">
-              <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
-                <h2 class="text-lg font-semibold m-0 flex items-center gap-2">
-                  <span class="w-2.5 h-2.5 rounded-full ${parts.length ? 'bg-orange-500' : 'bg-gray-300'}"></span>
+            <div class="panel">
+              <div class="module-head">
+                <h2 class="module-title">
+                  <span class="module-dot ${parts.length ? 'is-active' : ''}"></span>
                   ${MODULE_TITLES[modKey]}
                 </h2>
-                <span class="text-xs text-gray-500 font-medium">${parts.length} part type${parts.length === 1 ? '' : 's'}</span>
+                <span class="small muted">${parts.length} part type${parts.length === 1 ? '' : 's'}</span>
               </div>
 
               ${!parts.length
-                ? `<div class="p-6 text-center text-gray-400 text-sm italic">No parts added to ${modKey} module yet.</div>`
+                ? `<p class="panel-empty">No parts added to the ${modKey} module yet.</p>`
                 : `
-                  <div class="space-y-6">
+                  <div class="stack">
                     ${parts.map(p => {
                       const slots = p.machine_slots || [];
                       const installedCount = slots.filter(s => s.instance_id).length;
                       const isExpanded = expandedParts.has(p.id);
 
                       return `
-                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50/50">
-                          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <div class="flex items-center gap-2 flex-wrap">
-                              <span class="font-semibold text-base text-gray-900">${esc(p.name)}</span>
-                              <span class="mono badge badge-solid text-xs">${esc(p.part_number)}</span>${copyButton(p.part_number, 'Copy part number')}
+                        <div class="part-card">
+                          <div class="part-head">
+                            <div class="part-identity">
+                              <span class="part-name">${esc(p.name)}</span>
+                              <span class="badge badge-solid mono">${esc(p.part_number)}</span>${copyButton(p.part_number, 'Copy part number')}
                               ${p.serialized
-                                ? `<span class="badge badge-accent text-xs">Serialized (${installedCount}/${p.quantity} installed, ${p.placement_mode})</span>`
-                                : `<span class="badge text-xs text-gray-600">Non-serialized (${p.quantity} pcs)</span>`
+                                ? `<span class="badge badge-accent">Serialized (${installedCount}/${p.quantity} installed, ${p.placement_mode})</span>`
+                                : `<span class="badge badge-muted">Non-serialized (${p.quantity} pcs)</span>`
                               }
                             </div>
 
-                            <div class="flex items-center gap-2">
+                            <div class="row">
                               ${canManage ? `
-                                <button class="btn btn-ghost btn-sm text-xs edit-machine-part-btn" data-part-id="${p.id}">Edit part</button>
-                                <button class="btn btn-ghost btn-sm text-xs text-red-700 delete-machine-part-btn" data-part-id="${p.id}">Remove part</button>
+                                <button class="btn btn-ghost btn-sm edit-machine-part-btn" data-part-id="${p.id}">Edit part</button>
+                                <button class="btn btn-danger btn-sm delete-machine-part-btn" data-part-id="${p.id}">Remove</button>
                               ` : ''}
                               ${p.serialized
-                                ? `<button class="btn btn-ghost btn-sm text-xs toggle-expand-btn" data-part-id="${p.id}">
-                                    ${isExpanded ? '▲ Collapse Positions' : `▼ Expand Positions (${installedCount}/${p.quantity})`}
+                                ? `<button class="btn btn-secondary btn-sm toggle-expand-btn" data-part-id="${p.id}">
+                                    ${isExpanded ? 'Collapse positions' : `Expand positions (${installedCount}/${p.quantity})`}
                                   </button>`
                                 : (canManage
-                                    ? `<button class="btn btn-secondary btn-sm replace-non-ser-btn" data-part-id="${p.id}" data-name="${esc(p.name)}">Replace Part</button>`
+                                    ? `<button class="btn btn-secondary btn-sm replace-non-ser-btn" data-part-id="${p.id}" data-name="${esc(p.name)}">Replace part</button>`
                                     : '')
                               }
                             </div>
@@ -369,12 +369,12 @@ export async function render(container, params, ctx) {
                           ${p.serialized
                             ? (isExpanded
                                 ? renderSlotGrid(p, canManage)
-                                : `<div class="text-xs text-gray-500 bg-white p-2.5 rounded border border-gray-200 flex items-center justify-between cursor-pointer toggle-expand-btn" data-part-id="${p.id}">
-                                    <span>${installedCount} of ${p.quantity} positions occupied. Click expand to view/edit serials & markings.</span>
-                                    <span class="text-accent font-medium">Expand &rarr;</span>
-                                   </div>`
+                                : `<button type="button" class="part-summary toggle-expand-btn" data-part-id="${p.id}">
+                                    <span>${installedCount} of ${p.quantity} positions occupied. Expand to view, edit serials and markings.</span>
+                                    <span class="link-arrow">Expand &rarr;</span>
+                                   </button>`
                               )
-                            : `<div class="text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">Standard non-serialized part.</div>`
+                            : `<div class="part-note">Standard non-serialized part.</div>`
                           }
                         </div>
                       `;
@@ -394,38 +394,38 @@ export async function render(container, params, ctx) {
   function renderSlotGrid(p, canManage) {
     const slots = p.machine_slots || [];
     return `
-      <div class="slot-grid mt-3">
+      <div class="slot-grid">
         ${slots.map(s => {
           const inst = s.part_instances;
           const isEmpty = !inst;
           const isRma = inst && inst.rma_tagged;
 
           return `
-            <div class="slot ${isEmpty ? 'slot-empty' : (isRma ? 'slot-rma' : 'bg-white')} flex flex-col justify-between min-h-[120px]">
+            <div class="slot ${isEmpty ? 'slot-empty' : ''} ${isRma ? 'slot-rma' : ''}">
               <div>
-                <div class="flex items-center justify-between text-xs text-gray-500 font-medium">
-                  <span>Pos ${s.position}</span>
-                  ${isRma ? '<span class="badge badge-alert text-[11px] px-1 py-0 font-bold">RMA</span>' : ''}
+                <div class="row row-between">
+                  <span class="slot-pos">Pos ${s.position}</span>
+                  ${isRma ? '<span class="badge badge-danger">RMA</span>' : ''}
                 </div>
                 ${isEmpty
-                  ? `<span class="slot-serial text-gray-400 italic text-xs mt-2">Empty</span>`
+                  ? `<span class="slot-serial">Empty</span>`
                   : `
-                    <span class="slot-serial mono font-semibold text-sm mt-1 text-gray-900 break-all">${esc(inst.serial_number)}${copyButton(inst.serial_number, 'Copy serial number')}</span>
-                    ${inst.notes ? `<div class="text-[11px] text-amber-900 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-200 p-1 rounded mt-1.5 border border-amber-300 dark:border-amber-900 leading-tight">${esc(inst.notes)}</div>` : ''}
+                    <span class="slot-serial mono">${esc(inst.serial_number)}${copyButton(inst.serial_number, 'Copy serial number')}</span>
+                    ${inst.notes ? `<div class="note mt-1">${esc(inst.notes)}</div>` : ''}
                   `
                 }
               </div>
 
               ${canManage ? `
-                <div class="flex flex-wrap gap-1 mt-3 pt-2 border-t border-gray-100">
+                <div class="slot-actions">
                   ${isEmpty
-                    ? `<button class="btn btn-ghost btn-sm text-accent text-xs p-1 h-auto slot-fill-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-part-name="${esc(p.name)}">+ Serial</button>`
+                    ? `<button class="slot-action is-accent slot-fill-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-part-name="${esc(p.name)}">Add serial</button>`
                     : `
-                      <button class="btn btn-ghost btn-sm text-xs p-1 h-auto text-blue-700 slot-edit-btn" data-inst-id="${inst.id}" data-serial="${esc(inst.serial_number)}" data-notes="${esc(inst.notes || '')}" data-pos="${s.position}" data-part-name="${esc(p.name)}">Edit/Marking</button>
-                      <button class="btn btn-ghost btn-sm text-xs p-1 h-auto slot-replace-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}" data-part-name="${esc(p.name)}">Replace</button>
-                      <button class="btn btn-ghost btn-sm text-xs p-1 h-auto ${isRma ? 'text-green-700' : 'text-red-700'} slot-rma-btn" data-inst-id="${inst.id}" data-tagged="${isRma}">${isRma ? 'Untag RMA' : 'Tag RMA'}</button>
+                      <button class="slot-action slot-edit-btn" data-inst-id="${inst.id}" data-serial="${esc(inst.serial_number)}" data-notes="${esc(inst.notes || '')}" data-pos="${s.position}" data-part-name="${esc(p.name)}">Edit markings</button>
+                      <button class="slot-action slot-replace-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}" data-part-name="${esc(p.name)}">Replace</button>
+                      <button class="slot-action ${isRma ? 'is-success' : 'is-danger'} slot-rma-btn" data-inst-id="${inst.id}" data-tagged="${isRma}">${isRma ? 'Untag RMA' : 'Tag RMA'}</button>
                       ${p.placement_mode === 'flexible' && p.quantity > 1
-                        ? `<button class="btn btn-ghost btn-sm text-xs p-1 h-auto text-gray-600 slot-swap-btn" data-slot-id="${s.id}" data-part-id="${p.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}">Swap</button>`
+                        ? `<button class="slot-action slot-swap-btn" data-slot-id="${s.id}" data-part-id="${p.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}">Swap</button>`
                         : ''
                       }
                     `
@@ -440,7 +440,7 @@ export async function render(container, params, ctx) {
   }
 
   async function renderHistoryTab(container, machine) {
-    container.innerHTML = `<div class="p-6 text-center text-gray-400 text-sm">Loading event history for ${esc(machine.code)}...</div>`;
+    container.innerHTML = `<p class="loading">Loading event history for ${esc(machine.code)}...</p>`;
     try {
       const events = await listMaintenanceEvents({ machineId: machine.id, limit: 100 });
       if (!events.length) {
@@ -449,21 +449,21 @@ export async function render(container, params, ctx) {
       }
 
       container.innerHTML = `
-        <div class="panel bg-white">
-          <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
-            <h2 class="text-base font-semibold m-0">Machine ${esc(machine.code)} Maintenance Log</h2>
-            <a href="#/history?code=${encodeURIComponent(machine.code)}" class="text-xs text-accent font-medium hover:underline">Open in Global History Search &rarr;</a>
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Machine ${esc(machine.code)} maintenance log</h2>
+            <a href="#/history?code=${encodeURIComponent(machine.code)}" class="small strong">Open in global history search &rarr;</a>
           </div>
           <div class="table-wrap">
             <table class="table">
               <thead>
                 <tr>
                   <th>Timestamp</th>
-                  <th>Event Type</th>
-                  <th>Part & Position</th>
-                  <th>Serial(s) Involved</th>
+                  <th>Event type</th>
+                  <th>Part &amp; position</th>
+                  <th>Serial(s) involved</th>
                   <th>Technician</th>
-                  <th>Reason / Notes</th>
+                  <th>Reason / notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -476,22 +476,22 @@ export async function render(container, params, ctx) {
 
                   return `
                     <tr>
-                      <td class="text-xs text-gray-500 whitespace-nowrap">${dateStr}</td>
-                      <td><span class="badge badge-solid text-xs">${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}</span></td>
+                      <td class="tiny mono muted nowrap">${dateStr}</td>
+                      <td><span class="badge badge-muted">${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}</span></td>
                       <td>
-                        <span class="font-semibold text-gray-900">${esc(partName)}${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}</span>
-                        ${ev.position ? `<span class="text-xs text-gray-500 block">Pos ${ev.position}</span>` : ''}
+                        <span class="strong">${esc(partName)}</span>${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}
+                        ${ev.position ? `<div class="tiny muted">Pos ${ev.position}</div>` : ''}
                       </td>
-                      <td class="mono text-xs">
-                        ${oldSn ? `<div class="text-red-700 font-semibold">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
-                        ${newSn ? `<div class="text-green-700 font-semibold">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
-                        ${!oldSn && !newSn ? '<span class="text-gray-400">—</span>' : ''}
+                      <td class="mono tiny break-all">
+                        ${oldSn ? `<div class="text-danger strong">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                        ${newSn ? `<div class="text-success strong">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
+                        ${!oldSn && !newSn ? '<span class="muted">&mdash;</span>' : ''}
                       </td>
-                      <td class="text-sm font-medium">${esc(userName)}</td>
-                      <td class="text-xs text-gray-600">
-                        ${ev.reason ? `<div class="font-medium text-gray-800">${esc(ev.reason)}</div>` : ''}
-                        ${ev.notes ? `<div class="text-gray-500 italic mt-0.5">${esc(ev.notes)}</div>` : ''}
-                        ${!ev.reason && !ev.notes ? '<span class="text-gray-400">—</span>' : ''}
+                      <td class="small secondary">${esc(userName)}</td>
+                      <td class="tiny secondary">
+                        ${ev.reason ? `<div class="strong">${esc(ev.reason)}</div>` : ''}
+                        ${ev.notes ? `<div class="muted italic">${esc(ev.notes)}</div>` : ''}
+                        ${!ev.reason && !ev.notes ? '<span class="muted">&mdash;</span>' : ''}
                       </td>
                     </tr>
                   `;
@@ -502,7 +502,7 @@ export async function render(container, params, ctx) {
         </div>
       `;
     } catch (err) {
-      container.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded border border-red-200">Error loading machine history: ${esc(err.message)}</div>`;
+      container.innerHTML = alertText(`Error loading machine history: ${esc(err.message)}`);
     }
   }
 
@@ -540,23 +540,25 @@ export async function render(container, params, ctx) {
         const partName = btn.dataset.partName;
 
         openModal({
-          title: `Install Serial — ${partName} (Pos ${pos})`,
+          title: `Install serial &mdash; ${partName} (Pos ${pos})`,
           contentHtml: `
             <div class="field">
-              <label class="label" for="s-serial">Serial Number *</label>
-              <input class="input font-mono" id="s-serial" name="serial" required placeholder="e.g. SN-98124" style="text-transform:uppercase">
-            </div>
-            <div class="field flex items-center gap-3">
-              <input type="checkbox" id="s-rma" name="rma">
-              <label class="label mb-0 cursor-pointer text-red-700 font-medium" for="s-rma">Already damaged / Tag RMA on install</label>
+              <label class="label" for="s-serial">Serial number *</label>
+              <input class="input mono" id="s-serial" name="serial" required placeholder="e.g. SN-98124" style="text-transform:uppercase">
             </div>
             <div class="field">
-              <label class="label" for="s-notes">Technician Markings / Comments</label>
-              <textarea class="textarea" id="s-notes" name="notes" placeholder="e.g. Marked with red tape by previous technician, pin slightly worn..."></textarea>
+              <label class="checkbox-row" for="s-rma">
+                <input type="checkbox" id="s-rma" name="rma">
+                <span class="label">Already damaged &mdash; tag RMA on install</span>
+              </label>
+            </div>
+            <div class="field">
+              <label class="label" for="s-notes">Technician markings / comments</label>
+              <textarea class="textarea" id="s-notes" name="notes" placeholder="e.g. Marked with red tape by previous technician, pin slightly worn"></textarea>
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Install Serial',
+          submitText: 'Install serial',
           onSubmit: async (form, close) => {
             const serial = form.serial.value;
             const rma = form.rma.checked;
@@ -579,19 +581,19 @@ export async function render(container, params, ctx) {
         const partName = btn.dataset.partName;
 
         openModal({
-          title: `Edit Installed Unit Details — ${partName} (Pos ${pos})`,
+          title: `Edit installed unit details &mdash; ${partName} (Pos ${pos})`,
           contentHtml: `
             <div class="field">
-              <label class="label" for="eu-serial">Serial Number *</label>
-              <input class="input font-mono" id="eu-serial" name="serialNumber" required value="${esc(serial)}" style="text-transform:uppercase">
+              <label class="label" for="eu-serial">Serial number *</label>
+              <input class="input mono" id="eu-serial" name="serialNumber" required value="${esc(serial)}" style="text-transform:uppercase">
             </div>
             <div class="field">
-              <label class="label" for="eu-notes">Technician Markings / Observations / Comments</label>
-              <textarea class="textarea" id="eu-notes" name="notes" placeholder="e.g. Pin #2 scratched, marked with green dot by Tech B...">${esc(currentNotes)}</textarea>
+              <label class="label" for="eu-notes">Technician markings / observations / comments</label>
+              <textarea class="textarea" id="eu-notes" name="notes" placeholder="e.g. Pin 2 scratched, marked with green dot by technician B">${esc(currentNotes)}</textarea>
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Save Markings',
+          submitText: 'Save markings',
           onSubmit: async (form, close) => {
             const serialNumber = form.serialNumber.value;
             const notes = form.notes.value;
@@ -615,40 +617,40 @@ export async function render(container, params, ctx) {
           title: `Replace ${partName} (Pos ${pos} - ${currentSerial})`,
           contentHtml: `
             <div class="field">
-              <label class="label">Outcome for removed unit (${currentSerial}) *</label>
-              <div class="space-y-2 mt-1">
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <span class="label">Outcome for the removed unit (${currentSerial}) *</span>
+              <div class="stack-sm mt-1">
+                <label class="checkbox-row">
                   <input type="radio" name="outcome" value="rma" checked>
-                  <span><strong>Damaged &rarr; Tag RMA</strong> (returns to stock, flagged defective)</span>
+                  <span><strong>Damaged &rarr; tag RMA</strong> <span class="muted">(returns to stock, flagged defective)</span></span>
                 </label>
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <label class="checkbox-row">
                   <input type="radio" name="outcome" value="stock">
-                  <span><strong>Working</strong> (returns to stock as available)</span>
+                  <span><strong>Working</strong> <span class="muted">(returns to stock as available)</span></span>
                 </label>
-                <label class="flex items-center gap-2 text-sm cursor-pointer text-red-700">
+                <label class="checkbox-row text-danger">
                   <input type="radio" name="outcome" value="scrapped">
-                  <span><strong>Scrapped</strong> (permanently decommissioned)</span>
+                  <span><strong>Scrapped</strong> <span class="muted">(permanently decommissioned)</span></span>
                 </label>
               </div>
             </div>
 
-            <div class="field border-t border-gray-200 pt-4 mt-4">
-              <label class="label" for="s-new-serial">Replacement Serial Number</label>
-              <input class="input font-mono" id="s-new-serial" name="newSerial" placeholder="Enter new serial (leave empty if position stays vacant)" style="text-transform:uppercase">
+            <div class="field">
+              <label class="label" for="s-new-serial">Replacement serial number</label>
+              <input class="input mono" id="s-new-serial" name="newSerial" placeholder="Leave empty if the position stays vacant" style="text-transform:uppercase">
             </div>
 
             <div class="field">
-              <label class="label" for="s-reason">Reason for Replacement</label>
+              <label class="label" for="s-reason">Reason for replacement</label>
               <input class="input" id="s-reason" name="reason" placeholder="e.g. Malfunction during check, worn contact">
             </div>
 
             <div class="field">
-              <label class="label" for="s-notes">Technician Markings / Notes</label>
+              <label class="label" for="s-notes">Technician markings / notes</label>
               <textarea class="textarea" id="s-notes" name="notes"></textarea>
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Confirm Replacement',
+          submitText: 'Confirm replacement',
           onSubmit: async (form, close) => {
             const outcome = form.querySelector('input[name="outcome"]:checked').value;
             const newSerial = form.newSerial.value;
@@ -671,11 +673,11 @@ export async function render(container, params, ctx) {
         const actionLabel = currentlyTagged ? 'Untag RMA' : 'Tag RMA';
 
         openModal({
-          title: `${actionLabel} Unit`,
+          title: `${actionLabel} unit`,
           contentHtml: `
             <p>Are you sure you want to ${actionLabel.toLowerCase()} this unit?</p>
             <div class="field mt-4">
-              <label class="label" for="rma-note">Reason / Note</label>
+              <label class="label" for="rma-note">Reason / note</label>
               <input class="input" id="rma-note" name="note" placeholder="e.g. Reported defective to client vendor">
             </div>
             <p class="error-text"></p>
@@ -709,10 +711,10 @@ export async function render(container, params, ctx) {
         }
 
         openModal({
-          title: `Swap Positions — Pos ${posA} (${serialA})`,
+          title: `Swap positions &mdash; Pos ${posA} (${serialA})`,
           contentHtml: `
             <div class="field">
-              <label class="label" for="swap-target">Select Target Position *</label>
+              <label class="label" for="swap-target">Select target position *</label>
               <select class="select" id="swap-target" name="slotB" required>
                 ${otherSlots.map(s => `
                   <option value="${s.id}">Pos ${s.position} (${esc(s.part_instances.serial_number)})</option>
@@ -720,12 +722,12 @@ export async function render(container, params, ctx) {
               </select>
             </div>
             <div class="field">
-              <label class="label" for="swap-notes">Swap Notes</label>
+              <label class="label" for="swap-notes">Swap notes</label>
               <input class="input" id="swap-notes" name="notes" placeholder="e.g. Swapped for diagnostic testing">
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Swap Serials',
+          submitText: 'Swap serials',
           onSubmit: async (form, close) => {
             const slotB = form.slotB.value;
             const notes = form.notes.value;
@@ -744,9 +746,9 @@ export async function render(container, params, ctx) {
         const name = btn.dataset.name;
 
         openModal({
-          title: `Replace Non-Serialized Part: ${name}`,
+          title: `Replace non-serialized part: ${name}`,
           contentHtml: `
-            <p class="text-sm text-gray-600 mb-4">Replacing this part will decrement stock by 1 piece and log a replacement event.</p>
+            <p class="small secondary mb-4">Replacing this part decrements stock by 1 piece and logs a replacement event.</p>
             <div class="field">
               <label class="label" for="ns-reason">Reason</label>
               <input class="input" id="ns-reason" name="reason" placeholder="e.g. Scheduled maintenance replacement">
@@ -757,7 +759,7 @@ export async function render(container, params, ctx) {
             </div>
             <p class="error-text"></p>
           `,
-          submitText: 'Record Replacement',
+          submitText: 'Record replacement',
           onSubmit: async (form, close) => {
             const reason = form.reason.value;
             const notes = form.notes.value;
@@ -786,7 +788,7 @@ export async function render(container, params, ctx) {
 
   function renderTemplateChoices(types) {
     return types.map(type => `
-      <label class="flex items-center gap-2 text-sm">
+      <label class="checkbox-row small">
         <input type="checkbox" name="templateTypeIds" value="${type.id}">
         <span>${esc(type.name)}</span>
       </label>
@@ -796,43 +798,45 @@ export async function render(container, params, ctx) {
   async function openMachinePartEditor(part, machine, reload) {
     const templateTypes = await getMatchingTemplateTypes(machine, part);
     openModal({
-      title: `Edit Part — ${part.name}`,
+      title: `Edit part &mdash; ${part.name}`,
       contentHtml: `
         <div class="field">
-          <label class="label" for="mp-name">Part Name *</label>
+          <label class="label" for="mp-name">Part name *</label>
           <input class="input" id="mp-name" name="name" required value="${esc(part.name)}">
         </div>
         <div class="field">
-          <label class="label" for="mp-pn">Part Number *</label>
-          <input class="input font-mono" id="mp-pn" name="partNumber" required value="${esc(part.part_number)}" style="text-transform:uppercase">
+          <label class="label" for="mp-pn">Part number *</label>
+          <input class="input mono" id="mp-pn" name="partNumber" required value="${esc(part.part_number)}" style="text-transform:uppercase">
         </div>
         <div class="field">
           <label class="label" for="mp-qty">Quantity per machine *</label>
           <input class="input" id="mp-qty" name="quantity" type="number" min="1" required value="${part.quantity}">
         </div>
         <div class="field">
-          <label class="label" for="mp-placement">Placement Mode *</label>
-          <select class="select" name="placementMode">
+          <label class="label" for="mp-placement">Placement mode *</label>
+          <select class="select" id="mp-placement" name="placementMode">
             <option value="flexible" ${part.placement_mode === 'flexible' ? 'selected' : ''}>Flexible</option>
             <option value="fixed" ${part.placement_mode === 'fixed' ? 'selected' : ''}>Fixed</option>
           </select>
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" name="rmaApplicable" ${part.rma_applicable ? 'checked' : ''}>
-          <label class="label mb-0 cursor-pointer">RMA applicable</label>
+        <div class="field">
+          <label class="checkbox-row" for="mp-rma">
+            <input type="checkbox" id="mp-rma" name="rmaApplicable" ${part.rma_applicable ? 'checked' : ''}>
+            <span class="label">RMA applicable</span>
+          </label>
         </div>
         ${templateTypes.length ? `
-          <div class="field border border-gray-200 rounded-md p-3">
-            <div class="flex items-center gap-3">
+          <div class="field-box">
+            <label class="checkbox-row" for="mp-sync">
               <input type="checkbox" id="mp-sync" name="syncTemplates">
-              <label class="label mb-0 cursor-pointer" for="mp-sync">Apply these edits to other templates containing this part</label>
-            </div>
-            <div id="mp-template-list" class="hidden mt-3 space-y-2">${renderTemplateChoices(templateTypes)}</div>
+              <span class="label">Apply these edits to other templates containing this part</span>
+            </label>
+            <div id="mp-template-list" class="hidden stack-sm">${renderTemplateChoices(templateTypes)}</div>
           </div>
         ` : ''}
         <p class="error-text"></p>
       `,
-      submitText: 'Save Part',
+      submitText: 'Save part',
       onOpen: modal => {
         const sync = modal.querySelector('#mp-sync');
         const list = modal.querySelector('#mp-template-list');
@@ -864,20 +868,21 @@ export async function render(container, params, ctx) {
     }
     const templateTypes = await getMatchingTemplateTypes(machine, part);
     openModal({
-      title: `Remove Part — ${part.name}`,
+      title: `Remove part &mdash; ${part.name}`,
       danger: true,
+      submitText: 'Remove part',
       contentHtml: `
         <p>Remove <strong>${esc(part.name)}</strong> (${esc(part.part_number)}) from this machine?</p>
         ${templateTypes.length ? `
-          <div class="field border border-gray-200 rounded-md p-3 mt-4">
-            <div class="flex items-center gap-3">
+          <div class="field-box mt-4">
+            <label class="checkbox-row" for="mp-delete-sync">
               <input type="checkbox" id="mp-delete-sync" name="syncTemplates">
-              <label class="label mb-0 cursor-pointer" for="mp-delete-sync">Also remove it from other templates containing this part</label>
-            </div>
-            <div id="mp-delete-template-list" class="hidden mt-3 space-y-2">${renderTemplateChoices(templateTypes)}</div>
+              <span class="label">Also remove it from other templates containing this part</span>
+            </label>
+            <div id="mp-delete-template-list" class="hidden stack-sm">${renderTemplateChoices(templateTypes)}</div>
           </div>
         ` : ''}
-        <p class="text-sm text-gray-500 mt-3">Serialized units must be removed before the part definition can be deleted.</p>
+        <p class="small muted mt-3">Installed serials must be removed before the part definition can be deleted.</p>
         <p class="error-text"></p>
       `,
       submitText: 'Remove Part',

@@ -1,16 +1,18 @@
 import { listRmaUnits } from '../api/rma.js';
 import { setRmaTag } from '../api/parts.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 
 export async function render(container, params, ctx) {
-  container.innerHTML = pageHeader('RMA Defective Units', 'Units flagged as defective / declared for vendor return.') + `
-    <div class="mb-4">
-      <input type="search" id="search-rma" class="input w-64" placeholder="Filter by part or serial #...">
+  container.innerHTML = pageHeader('RMA Defective Units', 'Units flagged as defective or declared for vendor return.') + `
+    <div class="filter-row">
+      <div class="search-field">
+        <input type="search" id="search-rma" class="input" placeholder="Filter by part number or serial number">
+      </div>
     </div>
-    <div id="rma-container"><p class="text-gray-400 text-sm">Loading RMA tagged units...</p></div>
+    <div id="rma-container">${loadingState('Loading RMA tagged units...')}</div>
   `;
 
   async function loadAndRender() {
@@ -28,10 +30,10 @@ export async function render(container, params, ctx) {
           <table class="table" id="rma-table">
             <thead>
               <tr>
-                <th>Tagged At</th>
-                <th>Part Number</th>
-                <th>Serial Number</th>
-                <th>Location / Machine</th>
+                <th>Tagged at</th>
+                <th>Part number</th>
+                <th>Serial number</th>
+                <th>Location / machine</th>
                 <th>Status</th>
                 <th>Notes</th>
                 <th class="text-right">Actions</th>
@@ -40,19 +42,19 @@ export async function render(container, params, ctx) {
             <tbody>
               ${units.map(u => `
                 <tr>
-                  <td class="text-xs text-gray-500">${u.rma_tagged_at ? new Date(u.rma_tagged_at).toLocaleString() : '—'}</td>
-                  <td class="mono font-semibold">${esc(u.part_number)}${copyButton(u.part_number, 'Copy part number')}</td>
-                  <td class="mono font-semibold text-red-700">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</td>
+                  <td class="small muted nowrap">${u.rma_tagged_at ? new Date(u.rma_tagged_at).toLocaleString() : '&mdash;'}</td>
+                  <td class="mono strong">${esc(u.part_number)}${copyButton(u.part_number, 'Copy part number')}</td>
+                  <td class="mono strong text-danger">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</td>
                   <td>
                     ${u.location === 'machine' && u.machine_code
-                      ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="font-mono text-accent hover:underline">${esc(u.machine_code)} (Pos ${u.position})</a>`
-                      : `<span class="capitalize text-sm font-medium text-gray-700">${esc(u.location)}</span>`
+                      ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="mono">${esc(u.machine_code)}</a> <span class="muted small">(Pos ${u.position})</span>`
+                      : `<span class="capitalize small secondary">${esc(u.location)}</span>`
                     }
                   </td>
-                  <td><span class="badge badge-alert font-bold">RMA Tagged</span></td>
-                  <td class="text-sm text-gray-500">${esc(u.notes || '—')}</td>
+                  <td><span class="badge badge-danger"><span class="dot"></span>RMA tagged</span></td>
+                  <td class="small muted">${u.notes ? esc(u.notes) : '&mdash;'}</td>
                   <td class="text-right">
-                    <button class="btn btn-ghost btn-sm text-green-700 untag-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}">Untag RMA</button>
+                    <button class="btn btn-ghost btn-sm untag-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}">Untag RMA</button>
                   </td>
                 </tr>
               `).join('')}
@@ -77,17 +79,17 @@ export async function render(container, params, ctx) {
       });
 
     } catch (err) {
-      listEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Failed to load RMA list: ${esc(err.message)}</div>`;
+      listEl.innerHTML = alertText(`Failed to load RMA list: ${esc(err.message)}`);
     }
   }
 
   function handleUntag(instanceId, serial) {
     openModal({
-      title: `Untag RMA — Unit ${serial}`,
+      title: `Untag RMA &mdash; Unit ${serial}`,
       contentHtml: `
         <p>Are you sure you want to remove the RMA tag from unit <strong>${esc(serial)}</strong>?</p>
         <div class="field mt-4">
-          <label class="label" for="untag-note">Reason / Note</label>
+          <label class="label" for="untag-note">Reason / note</label>
           <input class="input" id="untag-note" name="note" placeholder="e.g. Unit repaired or false alarm">
         </div>
         <p class="error-text"></p>

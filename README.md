@@ -1,6 +1,6 @@
 # Maintenance Management App
 
-HTML + JavaScript (ES modules), Tailwind (CDN for now), Supabase, GitHub Pages.
+HTML + JavaScript (ES modules), native CSS design system (`css/app.css`), Supabase, GitHub Pages.
 See `PROJECT_FILES.md` for the tracked file list and `docs/DECISIONS.md` for agreed decisions.
 
 ## Run locally

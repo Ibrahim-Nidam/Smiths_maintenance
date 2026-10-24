@@ -6,7 +6,7 @@ import {
   updateTypeTemplate,
   deleteTypeTemplate,
 } from '../api/machines.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
@@ -20,28 +20,24 @@ export async function render(container, params, ctx) {
   }
 
   container.innerHTML = pageHeader('Settings', 'Manage machine types and template definitions for new machines.') + `
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      <div class="lg:col-span-1">
-        <div class="panel">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold m-0">Machine Types</h2>
-            <button id="btn-add-type" class="btn btn-ghost btn-sm text-accent">+ New</button>
-          </div>
-          <div id="types-list" class="space-y-1"><p class="text-gray-400 text-sm">Loading types...</p></div>
+    <div class="grid-3-1">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Machine types</h2>
+          <button id="btn-add-type" class="btn btn-ghost btn-sm">New type</button>
         </div>
+        <div id="types-list" class="type-list">${loadingState('Loading types...')}</div>
       </div>
 
-      <div class="lg:col-span-3">
-        <div class="panel">
-          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div>
-              <h2 id="template-title" class="text-xl font-semibold m-0">Type Template</h2>
-              <p class="text-sm text-gray-500 mt-1">Part definitions automatically copied when creating a machine of this type.</p>
-            </div>
-            <button id="btn-add-template-part" class="btn btn-primary btn-sm" disabled>+ Add template part</button>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 id="template-title" class="panel-title">Type template</h2>
+            <p class="small muted mt-1">Part definitions copied automatically when creating a machine of this type.</p>
           </div>
-          <div id="templates-container"><p class="text-gray-400 text-sm">Select a machine type to view its template parts.</p></div>
+          <button id="btn-add-template-part" class="btn btn-primary btn-sm" disabled>Add template part</button>
         </div>
+        <div id="templates-container">${loadingState('Select a machine type to view its template parts.')}</div>
       </div>
     </div>
   `;
@@ -54,7 +50,7 @@ export async function render(container, params, ctx) {
     try {
       machineTypes = await listMachineTypes();
       if (!machineTypes.length) {
-        listEl.innerHTML = `<p class="text-gray-400 text-sm">No machine types configured.</p>`;
+        listEl.innerHTML = `<p class="small muted">No machine types configured.</p>`;
         return;
       }
 
@@ -63,13 +59,13 @@ export async function render(container, params, ctx) {
       }
 
       listEl.innerHTML = machineTypes.map(t => `
-        <button class="type-item-btn w-full text-left px-3 py-2.5 rounded-md font-medium text-sm transition flex items-center justify-between ${t.id === selectedTypeId ? 'bg-orange-50 text-orange-900 border border-orange-200' : 'hover:bg-gray-100 text-gray-700'}" data-id="${t.id}">
+        <button class="type-item ${t.id === selectedTypeId ? 'is-active' : ''}" data-id="${t.id}" type="button">
           <span>${esc(t.name)}</span>
-          ${t.id === selectedTypeId ? '<span class="w-2 h-2 rounded-full bg-accent"></span>' : ''}
+          ${t.id === selectedTypeId ? '<span class="dot"></span>' : ''}
         </button>
       `).join('');
 
-      listEl.querySelectorAll('.type-item-btn').forEach(btn => {
+      listEl.querySelectorAll('.type-item').forEach(btn => {
         btn.addEventListener('click', () => {
           selectedTypeId = btn.dataset.id;
           loadTypes();
@@ -77,7 +73,7 @@ export async function render(container, params, ctx) {
         });
       });
     } catch (err) {
-      listEl.innerHTML = `<p class="text-red-500 text-sm">Error: ${esc(err.message)}</p>`;
+      listEl.innerHTML = `<p class="small text-danger">Error: ${esc(err.message)}</p>`;
     }
   }
 
@@ -104,7 +100,7 @@ export async function render(container, params, ctx) {
         containerEl.innerHTML = emptyState(
           'No template parts defined',
           `Add default parts for ${currentType ? currentType.name : 'this type'}.`,
-          `<button id="btn-add-part-empty" class="btn btn-primary btn-sm">+ Add first template part</button>`
+          `<button id="btn-add-part-empty" class="btn btn-primary btn-sm">Add first template part</button>`
         );
         const emptyBtn = containerEl.querySelector('#btn-add-part-empty');
         if (emptyBtn) emptyBtn.addEventListener('click', handleAddPart);
@@ -117,41 +113,43 @@ export async function render(container, params, ctx) {
       containerEl.innerHTML = modules.map(modKey => {
         const modParts = parts.filter(p => p.module === modKey);
         return `
-          <div class="mb-8 last:mb-0">
-            <h3 class="text-base font-semibold border-b border-gray-200 pb-2 mb-4 text-gray-800">${MODULE_LABELS[modKey]}</h3>
+          <section class="mb-8">
+            <h3 class="module-label">${MODULE_LABELS[modKey]}</h3>
             ${!modParts.length
-              ? `<p class="text-xs text-gray-400 italic">No parts in ${modKey} module.</p>`
+              ? `<p class="small muted italic">No parts in the ${modKey} module.</p>`
               : `
                 <div class="table-wrap">
                   <table class="table">
                     <thead>
                       <tr>
-                        <th>Part Name</th>
-                        <th>Part Number</th>
+                        <th>Part name</th>
+                        <th>Part number</th>
                         <th>Serialized</th>
-                        <th>Qty / Machine</th>
+                        <th>Qty / machine</th>
                         <th>Placement</th>
-                        <th>RMA Applicable</th>
+                        <th>RMA applicable</th>
                         <th class="text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       ${modParts.map(p => `
                         <tr>
-                          <td class="font-semibold">${esc(p.name)}</td>
-                          <td class="mono font-semibold text-gray-700">${esc(p.part_number)}${copyButton(p.part_number, 'Copy part number')}</td>
+                          <td class="strong">${esc(p.name)}</td>
+                          <td class="mono secondary">${esc(p.part_number)}${copyButton(p.part_number, 'Copy part number')}</td>
                           <td>
                             ${p.serialized
                               ? '<span class="badge badge-accent">Serialized</span>'
-                              : '<span class="badge text-gray-500 bg-gray-100">Non-serialized</span>'
+                              : '<span class="badge badge-muted">Non-serialized</span>'
                             }
                           </td>
                           <td class="mono">${p.quantity}</td>
-                          <td class="capitalize text-sm">${p.placement_mode}</td>
-                          <td>${p.rma_applicable ? 'Yes' : 'No'}</td>
+                          <td class="small capitalize secondary">${p.placement_mode}</td>
+                          <td class="small secondary">${p.rma_applicable ? 'Yes' : 'No'}</td>
                           <td class="text-right">
-                            <button class="btn btn-ghost btn-sm edit-part-btn" data-id="${p.id}" data-json="${esc(JSON.stringify(p))}">Edit</button>
-                            <button class="btn btn-ghost btn-sm btn-danger delete-part-btn" data-id="${p.id}" data-name="${esc(p.name)}">Delete</button>
+                            <div class="cell-actions">
+                              <button class="btn btn-ghost btn-sm edit-part-btn" data-id="${p.id}" data-json="${esc(JSON.stringify(p))}">Edit</button>
+                              <button class="btn btn-danger btn-sm delete-part-btn" data-id="${p.id}" data-name="${esc(p.name)}">Delete</button>
+                            </div>
                           </td>
                         </tr>
                       `).join('')}
@@ -160,7 +158,7 @@ export async function render(container, params, ctx) {
                 </div>
               `
             }
-          </div>
+          </section>
         `;
       }).join('');
 
@@ -176,21 +174,21 @@ export async function render(container, params, ctx) {
         });
       });
     } catch (err) {
-      containerEl.innerHTML = `<p class="text-red-500 text-sm">Failed to load template parts: ${esc(err.message)}</p>`;
+      containerEl.innerHTML = `<p class="small text-danger">Failed to load template parts: ${esc(err.message)}</p>`;
     }
   }
 
   function handleAddType() {
     openModal({
-      title: 'Add Machine Type',
+      title: 'Add machine type',
       contentHtml: `
         <div class="field">
-          <label class="label" for="type-name">Machine Type Name *</label>
+          <label class="label" for="type-name">Machine type name *</label>
           <input class="input" id="type-name" name="name" required placeholder="e.g. Morpho, Eclipse">
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Create Type',
+      submitText: 'Create type',
       onSubmit: async (form, close) => {
         const name = form.name.value;
         const created = await createMachineType(name);
@@ -207,7 +205,7 @@ export async function render(container, params, ctx) {
     if (!selectedTypeId) return;
 
     openModal({
-      title: 'Add Template Part',
+      title: 'Add template part',
       contentHtml: `
         <div class="field">
           <label class="label" for="p-module">Module *</label>
@@ -218,39 +216,43 @@ export async function render(container, params, ctx) {
           </select>
         </div>
         <div class="field">
-          <label class="label" for="p-name">Part Name *</label>
+          <label class="label" for="p-name">Part name *</label>
           <input class="input" id="p-name" name="name" required placeholder="e.g. DMA, Encoder, Belt">
         </div>
         <div class="field">
-          <label class="label" for="p-pn">Part Number *</label>
-          <input class="input font-mono" id="p-pn" name="partNumber" required placeholder="e.g. DMA-001" style="text-transform:uppercase">
+          <label class="label" for="p-pn">Part number *</label>
+          <input class="input mono" id="p-pn" name="partNumber" required placeholder="e.g. DMA-001" style="text-transform:uppercase">
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" id="p-serialized" name="serialized" checked>
-          <label class="label mb-0 cursor-pointer" for="p-serialized">Serialized (requires serial number per unit)</label>
+        <div class="field">
+          <label class="checkbox-row" for="p-serialized">
+            <input type="checkbox" id="p-serialized" name="serialized" checked>
+            <span class="label">Serialized (requires a serial number per unit)</span>
+          </label>
         </div>
         <div class="field">
           <label class="label" for="p-qty">Quantity per machine *</label>
           <input class="input" id="p-qty" name="quantity" type="number" min="1" value="1" required>
         </div>
         <div class="field">
-          <label class="label" for="p-placement">Placement Mode *</label>
+          <label class="label" for="p-placement">Placement mode *</label>
           <select class="select" id="p-placement" name="placementMode">
             <option value="flexible">Flexible (positions can swap serials)</option>
             <option value="fixed">Fixed (position is locked)</option>
           </select>
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" id="p-rma" name="rmaApplicable" checked>
-          <label class="label mb-0 cursor-pointer" for="p-rma">RMA applicable (damaged units can be tagged RMA)</label>
+        <div class="field">
+          <label class="checkbox-row" for="p-rma">
+            <input type="checkbox" id="p-rma" name="rmaApplicable" checked>
+            <span class="label">RMA applicable (damaged units can be tagged RMA)</span>
+          </label>
         </div>
         <div class="field">
-          <label class="label" for="p-desc">Description / Notes</label>
-          <textarea class="textarea" id="p-desc" name="description" placeholder="Optional notes..."></textarea>
+          <label class="label" for="p-desc">Description / notes</label>
+          <textarea class="textarea" id="p-desc" name="description" placeholder="Optional notes"></textarea>
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Add Part',
+      submitText: 'Add part',
       onSubmit: async (form, close) => {
         await createTypeTemplate({
           machineTypeId: selectedTypeId,
@@ -272,34 +274,38 @@ export async function render(container, params, ctx) {
 
   function handleEditPart(p) {
     openModal({
-      title: `Edit Template Part: ${p.name}`,
+      title: `Edit template part: ${p.name}`,
       contentHtml: `
         <div class="field">
-          <label class="label" for="p-name">Part Name *</label>
+          <label class="label" for="p-name">Part name *</label>
           <input class="input" id="p-name" name="name" required value="${esc(p.name)}">
         </div>
         <div class="field">
-          <label class="label" for="p-pn">Part Number *</label>
-          <input class="input font-mono" id="p-pn" name="partNumber" required value="${esc(p.part_number)}" style="text-transform:uppercase">
+          <label class="label" for="p-pn">Part number *</label>
+          <input class="input mono" id="p-pn" name="partNumber" required value="${esc(p.part_number)}" style="text-transform:uppercase">
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" id="p-serialized" name="serialized" ${p.serialized ? 'checked' : ''}>
-          <label class="label mb-0 cursor-pointer" for="p-serialized">Serialized</label>
+        <div class="field">
+          <label class="checkbox-row" for="p-serialized">
+            <input type="checkbox" id="p-serialized" name="serialized" ${p.serialized ? 'checked' : ''}>
+            <span class="label">Serialized</span>
+          </label>
         </div>
         <div class="field">
           <label class="label" for="p-qty">Quantity per machine *</label>
           <input class="input" id="p-qty" name="quantity" type="number" min="1" value="${p.quantity}" required>
         </div>
         <div class="field">
-          <label class="label" for="p-placement">Placement Mode *</label>
+          <label class="label" for="p-placement">Placement mode *</label>
           <select class="select" id="p-placement" name="placementMode">
             <option value="flexible" ${p.placement_mode === 'flexible' ? 'selected' : ''}>Flexible</option>
             <option value="fixed" ${p.placement_mode === 'fixed' ? 'selected' : ''}>Fixed</option>
           </select>
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" id="p-rma" name="rmaApplicable" ${p.rma_applicable ? 'checked' : ''}>
-          <label class="label mb-0 cursor-pointer" for="p-rma">RMA applicable</label>
+        <div class="field">
+          <label class="checkbox-row" for="p-rma">
+            <input type="checkbox" id="p-rma" name="rmaApplicable" ${p.rma_applicable ? 'checked' : ''}>
+            <span class="label">RMA applicable</span>
+          </label>
         </div>
         <div class="field">
           <label class="label" for="p-desc">Description</label>
@@ -307,7 +313,7 @@ export async function render(container, params, ctx) {
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Save Template Part',
+      submitText: 'Save template part',
       onSubmit: async (form, close) => {
         await updateTypeTemplate(p.id, {
           name: form.name.value,
@@ -327,12 +333,12 @@ export async function render(container, params, ctx) {
 
   function handleDeletePart(id, name) {
     openModal({
-      title: 'Delete Template Part',
+      title: 'Delete template part',
       danger: true,
       submitText: 'Delete',
       contentHtml: `
-        <p>Are you sure you want to remove <strong>${esc(name)}</strong> from this type template?</p>
-        <p class="text-sm text-gray-500 mt-2">Existing machines will not be affected.</p>
+        <p>Remove <strong>${esc(name)}</strong> from this type template?</p>
+        <p class="small muted mt-2">Existing machines will not be affected.</p>
         <p class="error-text"></p>
       `,
       onSubmit: async (form, close) => {

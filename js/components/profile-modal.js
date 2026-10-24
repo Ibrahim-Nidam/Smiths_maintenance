@@ -18,30 +18,26 @@ export async function openProfileModal(profile, onUpdateSuccess = null) {
     title: 'My Profile',
     contentHtml: `
       <div class="field">
-        <label class="label">Assigned Role (Read-only)</label>
-        <div>
-          <span class="badge badge-accent font-semibold text-sm py-1 px-3">
-            ${esc(ROLE_LABELS[profile.role] || profile.role)}
-          </span>
-        </div>
+        <label class="label">Assigned role (read-only)</label>
+        <div><span class="badge badge-accent">${esc(ROLE_LABELS[profile.role] || profile.role)}</span></div>
       </div>
       <div class="field">
-        <label class="label" for="profile-name">Full Name *</label>
+        <label class="label" for="profile-name">Full name *</label>
         <input class="input" id="profile-name" name="fullName" required value="${esc(profile.full_name || '')}">
       </div>
       <div class="field">
-        <label class="label" for="profile-email">Email Address *</label>
+        <label class="label" for="profile-email">Email address *</label>
         <input class="input" id="profile-email" name="email" type="email" required value="${esc(currentEmail)}">
       </div>
-      <hr class="my-4 border-gray-200 dark:border-gray-800">
-      <h4 class="font-semibold text-sm mb-2 text-gray-900 dark:text-gray-100">Change Password</h4>
-      <p class="text-xs text-gray-500 mb-3">Leave password fields empty if you do not wish to change your password.</p>
+      <hr>
+      <h4 class="small strong mb-2">Change password</h4>
+      <p class="tiny muted mb-3">Leave these fields empty if you do not want to change your password.</p>
       <div class="field">
-        <label class="label" for="profile-pass">New Password</label>
-        <input class="input" id="profile-pass" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Min 6 characters">
+        <label class="label" for="profile-pass">New password</label>
+        <input class="input" id="profile-pass" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Minimum 6 characters">
       </div>
       <div class="field">
-        <label class="label" for="profile-pass-confirm">Confirm New Password</label>
+        <label class="label" for="profile-pass-confirm">Confirm new password</label>
         <input class="input" id="profile-pass-confirm" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Re-enter new password">
       </div>
       <p class="error-text"></p>

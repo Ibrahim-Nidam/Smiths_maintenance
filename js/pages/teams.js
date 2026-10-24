@@ -1,5 +1,5 @@
 import { listTeams, createTeam, updateTeam, deleteTeam } from '../api/teams.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
@@ -8,11 +8,11 @@ export async function render(container, params, ctx) {
   const isGlobal = [ROLES.ADMIN, ROLES.MANAGER].includes(ctx.profile.role);
 
   const actions = isGlobal
-    ? `<button id="btn-add-team" class="btn btn-primary btn-sm">+ Add team</button>`
+    ? `<button id="btn-add-team" class="btn btn-primary btn-sm">Add team</button>`
     : '';
 
   container.innerHTML = pageHeader('Teams', 'Manage maintenance teams and assignments.', actions) +
-    `<div id="teams-list"><p class="text-gray-500 text-sm">Loading teams...</p></div>`;
+    `<div id="teams-list">${loadingState('Loading teams...')}</div>`;
 
   async function refresh() {
     const listEl = container.querySelector('#teams-list');
@@ -22,7 +22,7 @@ export async function render(container, params, ctx) {
         listEl.innerHTML = emptyState(
           'No teams created yet',
           'Create a team to organize your technicians and assign machines.',
-          isGlobal ? `<button id="btn-add-team-empty" class="btn btn-primary btn-sm">+ Add first team</button>` : ''
+          isGlobal ? `<button id="btn-add-team-empty" class="btn btn-primary btn-sm">Add first team</button>` : ''
         );
         const emptyBtn = listEl.querySelector('#btn-add-team-empty');
         if (emptyBtn) emptyBtn.addEventListener('click', handleAddTeam);
@@ -34,7 +34,7 @@ export async function render(container, params, ctx) {
           <table class="table">
             <thead>
               <tr>
-                <th>Team Name</th>
+                <th>Team name</th>
                 <th>Members</th>
                 ${isGlobal ? '<th class="text-right">Actions</th>' : ''}
               </tr>
@@ -42,14 +42,16 @@ export async function render(container, params, ctx) {
             <tbody>
               ${teams.map(t => `
                 <tr data-id="${t.id}">
-                  <td class="font-semibold">${esc(t.name)}</td>
+                  <td class="strong">${esc(t.name)}</td>
                   <td>
                     <span class="badge badge-accent">${t.member_count} member${t.member_count === 1 ? '' : 's'}</span>
                   </td>
                   ${isGlobal ? `
                     <td class="text-right">
-                      <button class="btn btn-ghost btn-sm edit-team-btn" data-id="${t.id}" data-name="${esc(t.name)}">Edit</button>
-                      <button class="btn btn-ghost btn-sm btn-danger delete-team-btn" data-id="${t.id}" data-name="${esc(t.name)}" ${t.member_count > 0 ? 'disabled title="Cannot delete team with active members"' : ''}>Delete</button>
+                      <div class="cell-actions">
+                        <button class="btn btn-ghost btn-sm edit-team-btn" data-id="${t.id}" data-name="${esc(t.name)}">Edit</button>
+                        <button class="btn btn-danger btn-sm delete-team-btn" data-id="${t.id}" data-name="${esc(t.name)}" ${t.member_count > 0 ? 'disabled title="Cannot delete team with active members"' : ''}>Delete</button>
+                      </div>
                     </td>
                   ` : ''}
                 </tr>
@@ -74,16 +76,16 @@ export async function render(container, params, ctx) {
         });
       });
     } catch (err) {
-      listEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Failed to load teams: ${esc(err.message)}</div>`;
+      listEl.innerHTML = alertText(`Failed to load teams: ${esc(err.message)}`);
     }
   }
 
   function handleAddTeam() {
     openModal({
-      title: 'Add New Team',
+      title: 'Add new team',
       contentHtml: `
         <div class="field">
-          <label class="label" for="team-name">Team Name *</label>
+          <label class="label" for="team-name">Team name *</label>
           <input class="input" id="team-name" name="name" required placeholder="e.g. Team A">
         </div>
         <p class="error-text"></p>
@@ -101,10 +103,10 @@ export async function render(container, params, ctx) {
 
   function handleEditTeam(team) {
     openModal({
-      title: 'Edit Team',
+      title: 'Edit team',
       contentHtml: `
         <div class="field">
-          <label class="label" for="team-name">Team Name *</label>
+          <label class="label" for="team-name">Team name *</label>
           <input class="input" id="team-name" name="name" required value="${esc(team.name)}">
         </div>
         <p class="error-text"></p>
@@ -122,12 +124,12 @@ export async function render(container, params, ctx) {
 
   function handleDeleteTeam(id, name) {
     openModal({
-      title: 'Delete Team',
+      title: 'Delete team',
       danger: true,
-      submitText: 'Delete',
+      submitText: 'Delete team',
       contentHtml: `
         <p>Are you sure you want to delete team <strong>${esc(name)}</strong>?</p>
-        <p class="text-sm text-gray-500 mt-2">This action cannot be undone.</p>
+        <p class="small muted mt-2">This action cannot be undone.</p>
         <p class="error-text"></p>
       `,
       onSubmit: async (form, close) => {

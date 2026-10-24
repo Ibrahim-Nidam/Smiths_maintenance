@@ -1,6 +1,6 @@
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword } from '../api/users.js';
 import { listTeams } from '../api/teams.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
@@ -16,7 +16,7 @@ const ROLE_BADGE_CLASSES = {
   [ROLES.ADMIN]: 'badge-solid',
   [ROLES.MANAGER]: 'badge-accent',
   [ROLES.TEAM_LEAD]: 'badge',
-  [ROLES.TECHNICIAN]: 'badge',
+  [ROLES.TECHNICIAN]: 'badge-muted',
 };
 
 export async function render(container, params, ctx) {
@@ -24,11 +24,11 @@ export async function render(container, params, ctx) {
   const canManage = isAdmin || ctx.profile.role === ROLES.MANAGER;
 
   const actions = canManage
-    ? `<button id="btn-add-user" class="btn btn-primary btn-sm">+ Create user</button>`
+    ? `<button id="btn-add-user" class="btn btn-primary btn-sm">Create user</button>`
     : '';
 
   container.innerHTML = pageHeader('Users', 'Manage user accounts, roles and team assignments.', actions) +
-    `<div id="users-list"><p class="text-gray-500 text-sm">Loading users...</p></div>`;
+    `<div id="users-list">${loadingState('Loading users...')}</div>`;
 
   async function refresh() {
     const listEl = container.querySelector('#users-list');
@@ -54,10 +54,10 @@ export async function render(container, params, ctx) {
           <table class="table">
             <thead>
               <tr>
-                <th>Full Name</th>
+                <th>Full name</th>
                 <th>Role</th>
                 <th>Team</th>
-                <th>Status (Click to toggle)</th>
+                <th>Status</th>
                 ${canManage ? '<th class="text-right">Actions</th>' : ''}
               </tr>
             </thead>
@@ -65,52 +65,50 @@ export async function render(container, params, ctx) {
               ${users.map(u => {
                 const isSelf = u.id === ctx.profile.id;
                 return `
-                  <tr data-id="${u.id}" class="${!u.active ? 'opacity-50 bg-gray-50' : ''}">
-                    <td class="font-semibold">
+                  <tr data-id="${u.id}" class="${!u.active ? 'is-muted' : ''}">
+                    <td class="strong">
                       ${esc(u.full_name)}
-                      ${isSelf ? ' <span class="text-xs text-orange-600 font-normal">(You)</span>' : ''}
+                      ${isSelf ? ' <span class="small muted">(you)</span>' : ''}
                     </td>
                     <td>
                       <span class="badge ${ROLE_BADGE_CLASSES[u.role] || ''}">
                         ${esc(ROLE_LABELS[u.role] || u.role)}
                       </span>
                     </td>
-                    <td>${esc(u.teams ? u.teams.name : '—')}</td>
+                    <td class="secondary">${esc(u.teams ? u.teams.name : '—')}</td>
                     <td>
                       <button type="button"
-                        class="toggle-active-btn inline-flex items-center text-xs font-medium px-2.5 py-1 rounded border transition cursor-pointer ${
-                          u.active
-                            ? 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100'
-                            : 'text-gray-500 bg-gray-100 border-gray-300 hover:bg-gray-200'
-                        }"
+                        class="state-toggle toggle-active-btn ${u.active ? 'is-on' : ''}"
                         data-id="${u.id}"
                         data-name="${esc(u.full_name)}"
                         data-active="${u.active}"
                         ${isSelf || !canManage ? 'disabled title="Status change disabled"' : ''}>
-                        ${u.active ? 'Active' : 'Disabled'}
+                        <span class="dot"></span>${u.active ? 'Active' : 'Disabled'}
                       </button>
                     </td>
                     ${canManage ? `
-                      <td class="text-right flex items-center justify-end gap-1">
-                        <button class="btn btn-ghost btn-sm edit-user-btn"
-                          data-id="${u.id}"
-                          data-name="${esc(u.full_name)}"
-                          data-role="${u.role}"
-                          data-team="${u.team_id || ''}"
-                          data-active="${u.active}">
-                          Edit
-                        </button>
-                        <button class="btn btn-ghost btn-sm reset-pass-btn"
-                          data-id="${u.id}"
-                          data-name="${esc(u.full_name)}">
-                          Reset Pass
-                        </button>
-                        <button class="btn btn-ghost btn-sm btn-danger delete-user-btn"
-                          data-id="${u.id}"
-                          data-name="${esc(u.full_name)}"
-                          ${isSelf ? 'disabled title="You cannot delete your own account"' : ''}>
-                          Delete
-                        </button>
+                      <td class="text-right">
+                        <div class="cell-actions">
+                          <button class="btn btn-ghost btn-sm edit-user-btn"
+                            data-id="${u.id}"
+                            data-name="${esc(u.full_name)}"
+                            data-role="${u.role}"
+                            data-team="${u.team_id || ''}"
+                            data-active="${u.active}">
+                            Edit
+                          </button>
+                          <button class="btn btn-ghost btn-sm reset-pass-btn"
+                            data-id="${u.id}"
+                            data-name="${esc(u.full_name)}">
+                            Reset password
+                          </button>
+                          <button class="btn btn-danger btn-sm delete-user-btn"
+                            data-id="${u.id}"
+                            data-name="${esc(u.full_name)}"
+                            ${isSelf ? 'disabled title="You cannot delete your own account"' : ''}>
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     ` : ''}
                   </tr>
@@ -168,7 +166,7 @@ export async function render(container, params, ctx) {
         });
       }
     } catch (err) {
-      listEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Failed to load users: ${esc(err.message)}</div>`;
+      listEl.innerHTML = alertText(`Failed to load users: ${esc(err.message)}`);
     }
   }
 
@@ -181,22 +179,22 @@ export async function render(container, params, ctx) {
     `;
 
     openModal({
-      title: 'Create User Account',
+      title: 'Create user account',
       contentHtml: `
-        <div class="p-3 bg-blue-50 text-blue-950 border border-blue-200 rounded text-xs mb-4 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-900">
-          <strong>Initial Password Note:</strong> Default password for new accounts is set to <code>Smiths2026!</code>. The user can update their password in Profile settings upon login.
+        <div class="alert alert-info mb-4">
+          <p class="alert-text">The default password for new accounts is <code>Smiths2026!</code>. The user can change it from their profile after signing in.</p>
         </div>
         <div class="field">
-          <label class="label" for="user-email">Email Address *</label>
+          <label class="label" for="user-email">Email address *</label>
           <input class="input" id="user-email" name="email" type="email" required placeholder="technician@company.com">
         </div>
         <div class="field">
-          <label class="label" for="user-pass">Initial Password *</label>
+          <label class="label" for="user-pass">Initial password *</label>
           <input class="input" id="user-pass" name="password" type="text" required value="Smiths2026!">
-          <span class="hint">Will be set to default password automatically if unchanged.</span>
+          <span class="hint">Kept as the default password if unchanged.</span>
         </div>
         <div class="field">
-          <label class="label" for="user-name">Full Name *</label>
+          <label class="label" for="user-name">Full name *</label>
           <input class="input" id="user-name" name="fullName" required placeholder="John Doe">
         </div>
         <div class="field">
@@ -206,15 +204,15 @@ export async function render(container, params, ctx) {
           </select>
         </div>
         <div class="field">
-          <label class="label" for="user-team">Assigned Team</label>
+          <label class="label" for="user-team">Assigned team</label>
           <select class="select" id="user-team" name="teamId">
-            <option value="">(No team / All teams)</option>
+            <option value="">No team / all teams</option>
             ${teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
           </select>
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Create Account',
+      submitText: 'Create account',
       onSubmit: async (form, close) => {
         const email = form.email.value.trim();
         const password = form.password.value || 'Smiths2026!';
@@ -243,10 +241,10 @@ export async function render(container, params, ctx) {
     `;
 
     openModal({
-      title: 'Edit User Profile',
+      title: 'Edit user profile',
       contentHtml: `
         <div class="field">
-          <label class="label" for="user-name">Full Name *</label>
+          <label class="label" for="user-name">Full name *</label>
           <input class="input" id="user-name" name="fullName" required value="${esc(user.fullName)}">
         </div>
         <div class="field">
@@ -256,19 +254,21 @@ export async function render(container, params, ctx) {
           </select>
         </div>
         <div class="field">
-          <label class="label" for="user-team">Assigned Team</label>
+          <label class="label" for="user-team">Assigned team</label>
           <select class="select" id="user-team" name="teamId">
-            <option value="">(No team / All teams)</option>
+            <option value="">No team / all teams</option>
             ${teams.map(t => `<option value="${t.id}" ${user.teamId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
           </select>
         </div>
-        <div class="field flex items-center gap-3">
-          <input type="checkbox" id="user-active" name="active" ${user.active ? 'checked' : ''} ${isSelf ? 'disabled' : ''}>
-          <label class="label mb-0 cursor-pointer" for="user-active">Account active</label>
+        <div class="field">
+          <label class="checkbox-row" for="user-active">
+            <input type="checkbox" id="user-active" name="active" ${user.active ? 'checked' : ''} ${isSelf ? 'disabled' : ''}>
+            <span class="label">Account active</span>
+          </label>
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Save Profile',
+      submitText: 'Save profile',
       onSubmit: async (form, close) => {
         const fullName = form.fullName.value.trim();
         const role = form.role ? form.role.value : user.role;
@@ -285,12 +285,12 @@ export async function render(container, params, ctx) {
 
   function handleResetPass(userId, userName) {
     openModal({
-      title: 'Reset User Password',
-      submitText: 'Reset Password',
+      title: 'Reset user password',
+      submitText: 'Reset password',
       contentHtml: `
-        <p>Reset password for user <strong>${esc(userName)}</strong>?</p>
-        <div class="p-3 bg-amber-50 text-amber-950 border border-amber-200 rounded text-xs mt-3 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900">
-          Password will be reset to default initial password: <code>Smiths2026!</code>
+        <p>Reset the password for <strong>${esc(userName)}</strong>?</p>
+        <div class="alert alert-warning mt-3">
+          <p class="alert-text">The password will be reset to the default: <code>Smiths2026!</code></p>
         </div>
         <p class="error-text mt-2"></p>
       `,
@@ -304,12 +304,12 @@ export async function render(container, params, ctx) {
 
   function handleDeleteUser(id, name) {
     openModal({
-      title: 'Delete User Profile',
+      title: 'Delete user account',
       danger: true,
-      submitText: 'Delete Account',
+      submitText: 'Delete account',
       contentHtml: `
-        <p>Are you sure you want to delete user account <strong>${esc(name)}</strong>?</p>
-        <p class="text-sm text-gray-500 mt-2">This will remove their profile record from the maintenance system.</p>
+        <p>Are you sure you want to delete the account of <strong>${esc(name)}</strong>?</p>
+        <p class="small muted mt-2">This removes the profile record from the maintenance system.</p>
         <p class="error-text"></p>
       `,
       onSubmit: async (form, close) => {

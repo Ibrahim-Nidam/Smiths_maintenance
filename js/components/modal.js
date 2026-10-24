@@ -5,15 +5,15 @@ export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitT
 
   backdrop.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="modal-title" class="text-xl font-semibold m-0">${title}</h2>
-        <button type="button" class="btn btn-ghost btn-sm close-btn" aria-label="Close">&times;</button>
+      <div class="modal-head">
+        <h2 id="modal-title" class="modal-title">${title}</h2>
+        <button type="button" class="modal-close close-btn" aria-label="Close">&times;</button>
       </div>
-      <form id="modal-form">
+      <form id="modal-form" class="modal-form">
         <div class="modal-body">${contentHtml}</div>
-        <div class="flex justify-end gap-3 mt-6">
+        <div class="modal-foot">
           <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
-          <button type="submit" class="btn ${danger ? 'btn-danger' : 'btn-primary'} submit-btn">${submitText}</button>
+          <button type="submit" class="btn ${danger ? 'btn-danger-solid' : 'btn-primary'} submit-btn">${submitText}</button>
         </div>
       </form>
     </div>
@@ -21,7 +21,16 @@ export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitT
 
   document.body.appendChild(backdrop);
 
-  const close = () => backdrop.remove();
+  const onKeydown = (e) => {
+    if (e.key === 'Escape') close();
+  };
+
+  const close = () => {
+    document.removeEventListener('keydown', onKeydown);
+    backdrop.remove();
+  };
+
+  document.addEventListener('keydown', onKeydown);
 
   backdrop.querySelector('.close-btn').addEventListener('click', close);
   backdrop.querySelector('.cancel-btn').addEventListener('click', close);
@@ -52,7 +61,7 @@ export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitT
   if (onOpen) {
     Promise.resolve(onOpen(backdrop)).catch(err => {
       const errEl = form.querySelector('.error-text');
-      if (errEl) errEl.textContent = err.message || 'Could not load available machine types.';
+      if (errEl) errEl.textContent = err.message || 'Could not load the requested data.';
     });
   }
 

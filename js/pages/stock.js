@@ -12,7 +12,7 @@ import {
 } from '../api/stock.js';
 import { updateSlotInstance } from '../api/parts.js';
 import { listMachineTypes, listTypeTemplates } from '../api/machines.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
@@ -22,18 +22,24 @@ export async function render(container, params, ctx) {
   const isGlobal = [ROLES.ADMIN, ROLES.MANAGER].includes(ctx.profile.role);
 
   const actions = isGlobal
-    ? `<button id="btn-add-stock" class="btn btn-primary btn-sm">+ Add item / unit</button>`
+    ? `<button id="btn-add-stock" class="btn btn-primary btn-sm">Add item / unit</button>`
     : '';
 
-  container.innerHTML = pageHeader('Stock & Inventory', 'Track company-wide serialized units, parts stock, and consumables.', actions) + `
-    <div class="border-b border-gray-200 mb-6 flex gap-6">
-      <button class="tab-btn py-3 border-b-2 font-medium text-sm text-accent border-accent" data-tab="serialized">Serialized Units</button>
-      <button class="tab-btn py-3 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-900" data-tab="non_serialized">Non-Serialized Parts</button>
-      <button class="tab-btn py-3 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-900" data-tab="consumable">Consumables</button>
-      <button class="tab-btn py-3 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-900" data-tab="movements">Stock Movements</button>
+  const TABS = [
+    { key: 'serialized', label: 'Serialized units' },
+    { key: 'non_serialized', label: 'Non-serialized parts' },
+    { key: 'consumable', label: 'Consumables' },
+    { key: 'movements', label: 'Stock movements' },
+  ];
+
+  container.innerHTML = pageHeader('Stock & inventory', 'Track company-wide serialized units, parts stock and consumables.', actions) + `
+    <div class="tabs" role="tablist">
+      ${TABS.map((t, i) => `
+        <button class="tab-btn" type="button" role="tab" data-tab="${t.key}" aria-selected="${i === 0}">${t.label}</button>
+      `).join('')}
     </div>
 
-    <div id="tab-content"><p class="text-gray-400 text-sm">Loading stock data...</p></div>
+    <div id="tab-content">${loadingState('Loading stock data...')}</div>
   `;
 
   let activeTab = 'serialized';
@@ -42,13 +48,10 @@ export async function render(container, params, ctx) {
     const contentEl = container.querySelector('#tab-content');
 
     container.querySelectorAll('.tab-btn').forEach(btn => {
-      const active = btn.dataset.tab === activeTab;
-      btn.className = `tab-btn py-3 border-b-2 font-medium text-sm transition ${
-        active ? 'text-accent border-accent font-semibold' : 'text-gray-500 border-transparent hover:text-gray-900'
-      }`;
+      btn.setAttribute('aria-selected', String(btn.dataset.tab === activeTab));
     });
 
-    contentEl.innerHTML = `<p class="text-gray-400 text-sm">Loading...</p>`;
+    contentEl.innerHTML = loadingState('Loading...');
 
     try {
       if (activeTab === 'serialized') {
@@ -66,15 +69,17 @@ export async function render(container, params, ctx) {
         }, {}));
 
         contentEl.innerHTML = `
-          <div class="mb-4 stock-search-row">
-            <input type="search" id="search-unit" class="input w-64" placeholder="Filter by part or serial #...">
+          <div class="filter-row">
+            <div class="search-field">
+              <input type="search" id="search-unit" class="input" placeholder="Filter by part number or serial number">
+            </div>
           </div>
           <div class="table-wrap">
             <table class="table" id="units-table">
               <thead>
                 <tr>
-                  <th>Part Number</th>
-                  <th>Part Name</th>
+                  <th>Part number</th>
+                  <th>Part name</th>
                   <th>Units</th>
                   <th>Installed</th>
                   <th>DOA</th>
@@ -89,10 +94,10 @@ export async function render(container, params, ctx) {
                   return `
                     <tr class="stock-group-row" data-group="${index}">
                       <td class="mono">${esc(partNumber)}${partNumber !== 'Uncategorized' ? copyButton(partNumber, 'Copy part number') : ''}</td>
-                      <td>${esc(group[0].part_name || '—')}</td>
+                      <td class="secondary">${esc(group[0].part_name || '—')}</td>
                       <td>${group.length}</td>
                       <td>${installed}</td>
-                      <td>${doa ? `<span class="badge badge-alert">${doa} DOA</span>` : '<span class="text-muted">—</span>'}</td>
+                      <td>${doa ? `<span class="badge badge-danger">${doa} DOA</span>` : '<span class="muted">&mdash;</span>'}</td>
                       <td class="text-right"><button class="btn btn-secondary btn-sm toggle-group" data-group="${index}" aria-expanded="false">Show units</button></td>
                     </tr>
                     <tr class="stock-group-details" data-group-details="${index}" hidden>
@@ -100,20 +105,20 @@ export async function render(container, params, ctx) {
                         <div class="stock-unit-list">
                           ${group.map(u => `
                             <div class="stock-unit-row">
-                              <div>
-                                <span class="mono">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</span>
-                                ${u.doa ? '<span class="badge badge-alert ml-2">DOA</span>' : ''}
+                              <div class="row">
+                                <span class="mono strong">${esc(u.serial_number)}${copyButton(u.serial_number, 'Copy serial number')}</span>
+                                ${u.doa ? '<span class="badge badge-danger">DOA</span>' : ''}
                               </div>
-                              <span class="text-sm text-secondary">
+                              <span class="small secondary">
                                 ${u.location === 'machine' && u.machine_code
-                                  ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="text-accent">${esc(u.machine_code)} (Pos ${u.position})</a>`
+                                  ? `<a href="#/machines/${encodeURIComponent(u.machine_code)}" class="mono">${esc(u.machine_code)}</a> <span class="muted">(Pos ${u.position})</span>`
                                   : esc(u.display_location || u.location || '—')}
                               </span>
-                              <span class="text-sm text-secondary">${esc(u.notes || 'No notes')}</span>
-                              ${isGlobal ? `<div class="flex gap-2 justify-end">
+                              <span class="small muted">${esc(u.notes || 'No notes')}</span>
+                              ${isGlobal ? `<div class="row row-end">
                                 <button class="btn btn-ghost btn-sm edit-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}" data-notes="${esc(u.notes || '')}" data-doa="${u.doa ? 'true' : 'false'}">Edit</button>
                                 <button class="btn btn-ghost btn-sm doa-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}" data-doa="${u.doa ? 'false' : 'true'}">${u.doa ? 'Clear DOA' : 'Mark DOA'}</button>
-                                <button class="btn btn-ghost btn-sm btn-danger delete-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}">Delete</button>
+                                <button class="btn btn-danger btn-sm delete-unit-btn" data-id="${u.id}" data-serial="${esc(u.serial_number)}">Delete</button>
                               </div>` : ''}
                             </div>
                           `).join('')}
@@ -177,10 +182,10 @@ export async function render(container, params, ctx) {
             <table class="table">
               <thead>
                 <tr>
-                  <th>Item Name</th>
-                  <th>Part Number</th>
-                  <th>Current Quantity</th>
-                  <th>Min Alert Qty</th>
+                  <th>Item name</th>
+                  <th>Part number</th>
+                  <th>Current quantity</th>
+                  <th>Min alert qty</th>
                   <th>Location</th>
                   ${isGlobal ? '<th class="text-right">Actions</th>' : ''}
                 </tr>
@@ -189,20 +194,22 @@ export async function render(container, params, ctx) {
                 ${items.map(it => {
                   const isLow = parseFloat(it.quantity) <= parseFloat(it.min_quantity);
                   return `
-                    <tr class="${isLow ? 'bg-amber-50/50' : ''}">
-                      <td>
+                    <tr class="${isLow ? 'is-warning' : ''}">
+                      <td class="strong">
                         ${esc(it.name)}
-                        ${isLow ? ' <span class="badge badge-alert text-[11px] ml-2">Low Stock</span>' : ''}
+                        ${isLow ? ' <span class="badge badge-danger">Low stock</span>' : ''}
                       </td>
                       <td class="mono">${esc(it.part_number || '—')}${it.part_number ? copyButton(it.part_number, 'Copy part number') : ''}</td>
-                      <td class="mono text-base ${isLow ? 'text-amber-700' : ''}">${it.quantity} ${esc(it.unit)}</td>
-                      <td class="mono text-secondary">${it.min_quantity} ${esc(it.unit)}</td>
-                      <td class="text-sm text-secondary">${esc(it.location || '—')}</td>
+                      <td class="mono ${isLow ? 'text-warning strong' : ''}">${it.quantity} ${esc(it.unit)}</td>
+                      <td class="mono secondary">${it.min_quantity} ${esc(it.unit)}</td>
+                      <td class="small secondary">${esc(it.location || '—')}</td>
                       ${isGlobal ? `
                         <td class="text-right">
-                          <button class="btn btn-ghost btn-sm adjust-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}" data-qty="${it.quantity}">Adjust Qty</button>
-                          <button class="btn btn-ghost btn-sm edit-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-pn="${esc(it.part_number || '')}" data-unit="${esc(it.unit)}" data-min="${it.min_quantity}" data-location="${esc(it.location || '')}">Edit</button>
-                          <button class="btn btn-ghost btn-sm btn-danger delete-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}">Delete</button>
+                          <div class="cell-actions">
+                            <button class="btn btn-ghost btn-sm adjust-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}" data-qty="${it.quantity}">Adjust qty</button>
+                            <button class="btn btn-ghost btn-sm edit-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}" data-pn="${esc(it.part_number || '')}" data-unit="${esc(it.unit)}" data-min="${it.min_quantity}" data-location="${esc(it.location || '')}">Edit</button>
+                            <button class="btn btn-danger btn-sm delete-stock-btn" data-id="${it.id}" data-name="${esc(it.name)}">Delete</button>
+                          </div>
                         </td>
                       ` : ''}
                     </tr>
@@ -221,13 +228,15 @@ export async function render(container, params, ctx) {
               unit: btn.dataset.unit,
               currentQty: btn.dataset.qty,
             });
-            contentEl.querySelectorAll('.edit-stock-btn').forEach(btn => {
-              btn.addEventListener('click', () => handleEditStockItem(btn.dataset));
-            });
-            contentEl.querySelectorAll('.delete-stock-btn').forEach(btn => {
-              btn.addEventListener('click', () => handleDeleteStockItem(btn.dataset.id, btn.dataset.name));
-            });
           });
+        });
+
+        contentEl.querySelectorAll('.edit-stock-btn').forEach(btn => {
+          btn.addEventListener('click', () => handleEditStockItem(btn.dataset));
+        });
+
+        contentEl.querySelectorAll('.delete-stock-btn').forEach(btn => {
+          btn.addEventListener('click', () => handleDeleteStockItem(btn.dataset.id, btn.dataset.name));
         });
 
       } else if (activeTab === 'movements') {
@@ -243,10 +252,10 @@ export async function render(container, params, ctx) {
               <thead>
                 <tr>
                   <th>Timestamp</th>
-                  <th>Item / Unit</th>
-                  <th>Change (Delta)</th>
-                  <th>From &rarr; To</th>
-                  <th>Performed By</th>
+                  <th>Item / unit</th>
+                  <th>Change (delta)</th>
+                  <th>From &rarr; to</th>
+                  <th>Performed by</th>
                   <th>Reason</th>
                 </tr>
               </thead>
@@ -256,14 +265,14 @@ export async function render(container, params, ctx) {
                   const isPositive = parseFloat(m.delta) > 0;
                   return `
                     <tr>
-                      <td class="text-xs text-gray-500">${new Date(m.created_at).toLocaleString()}</td>
-                      <td class="font-semibold text-sm">${esc(itemName)}</td>
-                      <td class="mono font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}">
+                      <td class="tiny mono muted nowrap">${new Date(m.created_at).toLocaleString()}</td>
+                      <td class="small strong">${esc(itemName)}</td>
+                      <td class="mono strong ${isPositive ? 'text-success' : 'text-danger'}">
                         ${isPositive ? '+' : ''}${m.delta}
                       </td>
-                      <td class="text-xs text-gray-600">${esc(m.from_location || '—')} &rarr; ${esc(m.to_location || '—')}</td>
-                      <td class="text-sm">${esc(m.profiles ? m.profiles.full_name : 'System')}</td>
-                      <td class="text-sm text-gray-500">${esc(m.reason || '—')}</td>
+                      <td class="tiny secondary">${esc(m.from_location || '—')} &rarr; ${esc(m.to_location || '—')}</td>
+                      <td class="small">${esc(m.profiles ? m.profiles.full_name : 'System')}</td>
+                      <td class="small muted">${esc(m.reason || '—')}</td>
                     </tr>
                   `;
                 }).join('')}
@@ -273,17 +282,17 @@ export async function render(container, params, ctx) {
         `;
       }
     } catch (err) {
-      contentEl.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">Error loading stock tab: ${esc(err.message)}</div>`;
+      contentEl.innerHTML = alertText(`Error loading stock tab: ${esc(err.message)}`);
     }
   }
 
   function handleEditUnit(unit) {
     openModal({
-      title: `Edit Unit ${unit.serial}`,
+      title: `Edit unit ${unit.serial}`,
       contentHtml: `
         <div class="field">
-          <label class="label" for="unit-serial">Serial Number *</label>
-          <input class="input font-mono" id="unit-serial" name="serial" value="${unit.serial}" required>
+          <label class="label" for="unit-serial">Serial number *</label>
+          <input class="input mono" id="unit-serial" name="serial" value="${unit.serial}" required>
         </div>
         <div class="field">
           <label class="label" for="unit-notes">Notes</label>
@@ -306,11 +315,11 @@ export async function render(container, params, ctx) {
 
   function handleDeleteUnit(instanceId, serial) {
     openModal({
-      title: `Delete Unit ${serial}?`,
+      title: `Delete unit ${serial}?`,
       danger: true,
-      submitText: 'Delete Unit',
+      submitText: 'Delete unit',
       contentHtml: `
-        <p>This removes the unit from active stock. Its historical movements will remain preserved.</p>
+        <p>This removes the unit from active stock. Its historical movements remain preserved.</p>
         <p class="error-text"></p>
       `,
       onSubmit: async (form, close) => {
@@ -327,23 +336,23 @@ export async function render(container, params, ctx) {
       title: `Edit ${item.name}`,
       contentHtml: `
         <div class="field">
-          <label class="label" for="edit-stock-name">Item Name *</label>
+          <label class="label" for="edit-stock-name">Item name *</label>
           <input class="input" id="edit-stock-name" name="name" value="${item.name}" required>
         </div>
         <div class="field">
-          <label class="label" for="edit-stock-pn">Part Number</label>
-          <input class="input font-mono" id="edit-stock-pn" name="partNumber" value="${item.pn}">
+          <label class="label" for="edit-stock-pn">Part number</label>
+          <input class="input mono" id="edit-stock-pn" name="partNumber" value="${item.pn}">
         </div>
         <div class="field">
           <label class="label" for="edit-stock-unit">Unit</label>
           <input class="input" id="edit-stock-unit" name="unit" value="${item.unit || 'pcs'}">
         </div>
         <div class="field">
-          <label class="label" for="edit-stock-min">Minimum Warning Threshold</label>
+          <label class="label" for="edit-stock-min">Minimum warning threshold</label>
           <input class="input" id="edit-stock-min" name="minQuantity" type="number" min="0" step="any" value="${item.min || 0}">
         </div>
         <div class="field">
-          <label class="label" for="edit-stock-location">Storage Location</label>
+          <label class="label" for="edit-stock-location">Storage location</label>
           <input class="input" id="edit-stock-location" name="location" value="${item.location || ''}">
         </div>
         <p class="error-text"></p>
@@ -368,7 +377,7 @@ export async function render(container, params, ctx) {
     openModal({
       title: `Delete ${name}?`,
       danger: true,
-      submitText: 'Delete Part',
+      submitText: 'Delete part',
       contentHtml: `
         <p>This removes the part from the active stock list. Existing stock movements remain preserved for audit history.</p>
         <p class="error-text"></p>
@@ -386,63 +395,63 @@ export async function render(container, params, ctx) {
     const types = await listMachineTypes().catch(() => []);
 
     openModal({
-      title: 'Add to Stock / Inventory',
+      title: 'Add to stock / inventory',
       contentHtml: `
         <div class="field">
-          <label class="label" for="st-machine-type">Machine Type *</label>
+          <label class="label" for="st-machine-type">Machine type *</label>
           <select class="select" id="st-machine-type" name="machineTypeId" required>
-            <option value="">-- Select Machine Type --</option>
+            <option value="">Select machine type</option>
             ${types.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
-            <option value="__manual__">+ Manual / Consumable Item</option>
+            <option value="__manual__">Manual / consumable item</option>
           </select>
         </div>
 
         <div class="field" id="st-reg-part-field" style="display:none">
-          <label class="label" for="st-reg-part">Registered Part Definition</label>
+          <label class="label" for="st-reg-part">Registered part definition</label>
           <select class="select" id="st-reg-part" name="regPart">
-            <option value="">-- Select Registered Part --</option>
+            <option value="">Select registered part</option>
           </select>
         </div>
 
         <div class="field">
-          <label class="label" for="st-kind">Stock Category *</label>
+          <label class="label" for="st-kind">Stock category *</label>
           <select class="select" id="st-kind" name="itemType" required>
-            <option value="serialized">Serialized Unit (Physical unit with serial #)</option>
-            <option value="non_serialized">Non-Serialized Part (Bulk quantity by part #)</option>
-            <option value="consumable">Consumable (Screws, cables, grease...)</option>
+            <option value="serialized">Serialized unit (physical unit with serial number)</option>
+            <option value="non_serialized">Non-serialized part (bulk quantity by part number)</option>
+            <option value="consumable">Consumable (screws, cables, grease...)</option>
           </select>
         </div>
 
         <div id="st-fields-serialized">
           <div class="field">
-            <label class="label" for="st-ser-pn">Part Number *</label>
-            <input class="input font-mono" id="st-ser-pn" name="serPartNumber" placeholder="e.g. DMA-001" style="text-transform:uppercase" required>
+            <label class="label" for="st-ser-pn">Part number *</label>
+            <input class="input mono" id="st-ser-pn" name="serPartNumber" placeholder="e.g. DMA-001" style="text-transform:uppercase" required>
           </div>
           <div class="field">
-            <label class="label" for="st-ser-sn">Serial Number *</label>
-            <input class="input font-mono" id="st-ser-sn" name="serSerialNumber" placeholder="e.g. SN-88123" style="text-transform:uppercase" required>
+            <label class="label" for="st-ser-sn">Serial number *</label>
+            <input class="input mono" id="st-ser-sn" name="serSerialNumber" placeholder="e.g. SN-88123" style="text-transform:uppercase" required>
           </div>
           <div class="field">
-            <label class="label" for="st-ser-loc">Storage Location</label>
+            <label class="label" for="st-ser-loc">Storage location</label>
             <input class="input" id="st-ser-loc" name="serLocation" placeholder="e.g. Shelf B2, Warehouse Main">
           </div>
           <div class="field">
             <label class="label" for="st-ser-notes">Notes</label>
-            <input class="input" id="st-ser-notes" name="serNotes" placeholder="Optional notes...">
+            <input class="input" id="st-ser-notes" name="serNotes" placeholder="Optional notes">
           </div>
         </div>
 
         <div id="st-fields-bulk" style="display:none">
           <div class="field">
-            <label class="label" for="st-name">Item Name *</label>
+            <label class="label" for="st-name">Item name *</label>
             <input class="input" id="st-name" name="name" placeholder="e.g. Encoder, M4 Screws">
           </div>
           <div class="field">
-            <label class="label" for="st-pn">Part Number</label>
-            <input class="input font-mono" id="st-pn" name="partNumber" placeholder="Optional part #" style="text-transform:uppercase">
+            <label class="label" for="st-pn">Part number</label>
+            <input class="input mono" id="st-pn" name="partNumber" placeholder="Optional part number" style="text-transform:uppercase">
           </div>
           <div class="field">
-            <label class="label" for="st-init">Initial Quantity</label>
+            <label class="label" for="st-init">Initial quantity</label>
             <input class="input" id="st-init" name="initialQuantity" type="number" step="any" min="0" value="0">
           </div>
           <div class="field">
@@ -450,17 +459,17 @@ export async function render(container, params, ctx) {
             <input class="input" id="st-unit" name="unit" value="pcs" placeholder="pcs, meters, boxes">
           </div>
           <div class="field">
-            <label class="label" for="st-min">Minimum Warning Threshold</label>
+            <label class="label" for="st-min">Minimum warning threshold</label>
             <input class="input" id="st-min" name="minQuantity" type="number" step="any" min="0" value="5">
           </div>
           <div class="field">
-            <label class="label" for="st-loc">Storage Location</label>
+            <label class="label" for="st-loc">Storage location</label>
             <input class="input" id="st-loc" name="location" placeholder="e.g. Shelf B3">
           </div>
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Add to Stock',
+      submitText: 'Add to stock',
       onSubmit: async (form, close) => {
         const itemType = form.itemType.value;
         if (itemType === 'serialized') {
@@ -519,11 +528,11 @@ export async function render(container, params, ctx) {
           try {
             currentTemplates = await listTypeTemplates(typeId);
             regPartSelect.innerHTML = `
-              <option value="">-- Select Registered Part --</option>
+              <option value="">Select registered part</option>
               ${currentTemplates.map(p => `
-                <option value="${p.id}">${esc(p.part_number)} — ${esc(p.name)} (${p.serialized ? 'Serialized' : 'Non-serialized'})</option>
+                <option value="${p.id}">${esc(p.part_number)} &mdash; ${esc(p.name)} (${p.serialized ? 'Serialized' : 'Non-serialized'})</option>
               `).join('')}
-              <option value="__custom__">+ Enter Custom Part Number</option>
+              <option value="__custom__">Enter custom part number</option>
             `;
           } catch (err) {
             regPartSelect.innerHTML = `<option value="">Error loading parts</option>`;
@@ -563,13 +572,13 @@ export async function render(container, params, ctx) {
 
   function handleAdjustStock(item) {
     openModal({
-      title: `Adjust Stock: ${item.name}`,
+      title: `Adjust stock: ${item.name}`,
       contentHtml: `
-        <p class="text-sm text-gray-600 mb-3">Current Quantity: <strong>${item.currentQty} ${item.unit}</strong></p>
+        <p class="small secondary mb-3">Current quantity: <strong>${item.currentQty} ${item.unit}</strong></p>
         <div class="field">
-          <label class="label" for="adj-delta">Quantity Change (Delta) *</label>
-          <input class="input" id="adj-delta" name="delta" type="number" step="any" required placeholder="e.g. +10 or -2">
-          <p class="hint">Use positive number to add stock, negative to consume stock.</p>
+          <label class="label" for="adj-delta">Quantity change (delta) *</label>
+          <input class="input" id="adj-delta" name="delta" type="number" step="any" required placeholder="e.g. 10 or -2">
+          <p class="hint">Use a positive number to add stock, a negative number to consume stock.</p>
         </div>
         <div class="field">
           <label class="label" for="adj-reason">Reason *</label>
@@ -577,7 +586,7 @@ export async function render(container, params, ctx) {
         </div>
         <p class="error-text"></p>
       `,
-      submitText: 'Adjust Stock',
+      submitText: 'Adjust stock',
       onSubmit: async (form, close) => {
         const delta = form.delta.value;
         const reason = form.reason.value;

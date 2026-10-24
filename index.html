@@ -12,15 +12,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="js/tailwind-config.js"></script>
   <link rel="stylesheet" href="css/app.css">
-  <title>Sign in - Maintenance</title>
+  <title>Sign in &middot; Maintenance</title>
 </head>
 <body class="auth-body">
   <div class="auth-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
-      <div class="brand" style="margin-bottom: 0;"><span class="brand-mark"></span>Maintenance</div>
+    <div class="auth-head">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Maintenance</div>
       <button id="theme-toggle-btn" class="theme-toggle-btn" type="button"></button>
     </div>
     <h1 class="auth-title">Sign in</h1>
@@ -36,6 +34,7 @@
       <p id="error" class="error-text" role="alert"></p>
       <button id="login" class="btn btn-primary btn-block" type="submit">Sign in</button>
     </form>
+    <p class="auth-foot">Internal tool &middot; Smiths maintenance team</p>
   </div>
   <script type="module">
     import { signIn, getSession, getProfile } from './js/auth.js';

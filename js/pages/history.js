@@ -1,5 +1,5 @@
 import { listMaintenanceEvents } from '../api/history.js';
-import { pageHeader, emptyState, esc } from '../components/ui.js';
+import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { copyButton } from '../components/input-enhancements.js';
 
 const EVENT_LABELS = {
@@ -17,44 +17,52 @@ const EVENT_LABELS = {
 };
 
 const EVENT_BADGE_CLASSES = {
-  part_installed: 'badge-accent',
-  part_removed: 'badge-alert',
-  part_replaced: 'badge-solid',
-  parts_swapped: 'badge border-purple-600/30 bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-300',
-  rma_tagged: 'badge-alert font-bold',
-  rma_untagged: 'badge border-emerald-600/30 bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300',
-  machine_created: 'badge border-blue-600/30 bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300',
-  machine_updated: 'badge border-amber-600/30 bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
+  part_installed: 'badge-success',
+  part_removed: 'badge-muted',
+  part_replaced: 'badge-accent',
+  parts_swapped: 'badge-warning',
+  part_added_to_machine: 'badge-success',
+  rma_tagged: 'badge-danger',
+  rma_untagged: 'badge-success',
+  machine_created: 'badge-accent',
+  machine_updated: 'badge-muted',
+  stock_adjusted: 'badge-muted',
+  correction: 'badge-warning',
 };
+
+const CATEGORIES = [
+  { key: 'all', label: 'All events' },
+  { key: 'installed', label: 'Installed' },
+  { key: 'replaced', label: 'Replaced' },
+  { key: 'swapped', label: 'Swapped' },
+  { key: 'removed', label: 'Removed' },
+  { key: 'rma', label: 'RMA tags' },
+  { key: 'system', label: 'Machine / stock' },
+];
 
 export async function render(container, params, ctx) {
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
   const initialQuery = urlParams.get('code') || urlParams.get('sn') || urlParams.get('q') || '';
   let activeCategory = 'all';
 
-  container.innerHTML = pageHeader('Maintenance History', 'Complete append-only audit trail and part lifecycle tracking across all machines and positions.') + `
-    <div class="space-y-4 mb-6 history-filters">
-      <div class="flex flex-wrap gap-4 items-center justify-between">
-        <div class="flex flex-wrap gap-3 items-center flex-1 max-w-xl">
-          <input type="search" id="search-history" class="input flex-1 font-medium" placeholder="Search by Machine, Part #, Serial #, Position, Tech, or Reason..." value="${esc(initialQuery)}">
+  container.innerHTML = pageHeader('Maintenance history', 'Complete append-only audit trail and part lifecycle tracking across all machines and positions.') + `
+    <div>
+      <div class="filter-bar-inline">
+        <div class="search-field">
+          <input type="search" id="search-history" class="input" placeholder="Search by machine, part number, serial, position, technician or reason" value="${esc(initialQuery)}">
         </div>
-        <span id="event-count" class="text-xs text-gray-600 dark:text-gray-400 font-bold"></span>
+        <span id="event-count" class="small muted"></span>
       </div>
 
-      <!-- Pre-defined Quick Filter Pills -->
-      <div id="history-filter-pills" class="flex flex-wrap gap-2 items-center pt-1 border-t border-gray-200 dark:border-gray-800">
-        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider mr-1">Filter:</span>
-        <button class="filter-pill btn btn-sm btn-primary" data-category="all">All Events</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="installed">Installed</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="replaced">Replaced</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="swapped">Swapped</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="removed">Removed</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="rma">RMA Tags</button>
-        <button class="filter-pill btn btn-sm btn-secondary" data-category="system">Machine/Stock</button>
+      <div id="history-filter-pills" class="filter-row">
+        <span class="filter-label">Filter</span>
+        ${CATEGORIES.map(c => `
+          <button class="chip filter-pill" data-category="${c.key}" type="button">${c.label}</button>
+        `).join('')}
       </div>
     </div>
 
-    <div id="history-container"><p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Loading history events...</p></div>
+    <div id="history-container">${loadingState('Loading history events...')}</div>
   `;
 
   let allEvents = [];
@@ -62,8 +70,7 @@ export async function render(container, params, ctx) {
   try {
     allEvents = await listMaintenanceEvents({ limit: 500 });
   } catch (err) {
-    container.querySelector('#history-container').innerHTML =
-      `<div class="p-4 bg-red-50 text-red-900 rounded-md border border-red-200 font-semibold">Failed to load history: ${esc(err.message)}</div>`;
+    container.querySelector('#history-container').innerHTML = alertText(`Failed to load history: ${esc(err.message)}`);
     return;
   }
 
@@ -104,14 +111,9 @@ export async function render(container, params, ctx) {
              eventType.includes(query);
     });
 
-    // Update Category Pills UI
+    // Update category pills UI
     container.querySelectorAll('.filter-pill').forEach(btn => {
-      const cat = btn.dataset.category;
-      if (cat === activeCategory) {
-        btn.className = 'filter-pill btn btn-sm btn-primary font-bold';
-      } else {
-        btn.className = 'filter-pill btn btn-sm btn-secondary font-medium';
-      }
+      btn.classList.toggle('is-active', btn.dataset.category === activeCategory);
     });
 
     const countEl = container.querySelector('#event-count');
@@ -128,18 +130,18 @@ export async function render(container, params, ctx) {
     }
 
     listEl.innerHTML = `
-      <div class="table-wrap border border-gray-200 dark:border-gray-800">
+      <div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
-              <th>Date & Time</th>
-              <th>Event Type</th>
+              <th>Date &amp; time</th>
+              <th>Event type</th>
               <th>Machine</th>
-              <th>Module & Part</th>
+              <th>Module &amp; part</th>
               <th>Position</th>
-              <th>Serial(s) Involved</th>
+              <th>Serial(s) involved</th>
               <th>Technician</th>
-              <th>Reason / Notes</th>
+              <th>Reason / notes</th>
             </tr>
           </thead>
           <tbody>
@@ -151,40 +153,33 @@ export async function render(container, params, ctx) {
               const newSn = ev.new_instance ? ev.new_instance.serial_number : null;
               const partName = ev.machine_parts ? ev.machine_parts.name : (ev.part_number || '—');
               const module = ev.machine_parts ? ev.machine_parts.module : '';
-              const badgeClass = EVENT_BADGE_CLASSES[ev.event_type] || 'badge-solid';
+              const badgeClass = EVENT_BADGE_CLASSES[ev.event_type] || 'badge';
 
               return `
                 <tr>
-                  <td class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap font-mono font-medium">${dateStr}</td>
-                  <td>
-                    <span class="badge ${badgeClass} text-xs font-semibold">
-                      ${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}
-                    </span>
-                  </td>
+                  <td class="tiny mono muted nowrap">${dateStr}</td>
+                  <td><span class="badge ${badgeClass}">${esc(EVENT_LABELS[ev.event_type] || ev.event_type)}</span></td>
                   <td>
                     ${machineCode !== '—'
-                      ? `<a href="#/machines/${encodeURIComponent(machineCode)}" class="font-mono font-extrabold text-accent hover:underline">${esc(machineCode)}</a>`
-                      : '<span class="text-gray-400">—</span>'
+                      ? `<a href="#/machines/${encodeURIComponent(machineCode)}" class="mono strong">${esc(machineCode)}</a>`
+                      : '<span class="muted">&mdash;</span>'
                     }
                   </td>
                   <td>
-                    <span class="font-bold text-gray-900 dark:text-gray-100">${esc(partName)}</span>
-                    ${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}
-                    ${module ? `<span class="text-xs text-gray-500 dark:text-gray-400 capitalize block font-medium">${module}</span>` : ''}
+                    <span class="strong">${esc(partName)}</span>${ev.part_number ? copyButton(ev.part_number, 'Copy part number') : ''}
+                    ${module ? `<div class="tiny muted capitalize">${module}</div>` : ''}
                   </td>
-                  <td>
-                    ${ev.position ? `<span class="mono font-semibold text-gray-800 dark:text-gray-200">Pos ${ev.position}</span>` : '<span class="text-gray-400">—</span>'}
+                  <td>${ev.position ? `<span class="mono secondary">Pos ${ev.position}</span>` : '<span class="muted">&mdash;</span>'}</td>
+                  <td class="mono tiny break-all">
+                    ${oldSn ? `<div class="text-danger strong">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                    ${newSn ? `<div class="text-success strong">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
+                    ${!oldSn && !newSn ? '<span class="muted">&mdash;</span>' : ''}
                   </td>
-                  <td class="mono text-xs">
-                    ${oldSn ? `<div class="text-red-700 dark:text-red-400 font-bold">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
-                    ${newSn ? `<div class="text-emerald-700 dark:text-emerald-400 font-bold">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
-                    ${!oldSn && !newSn ? '<span class="text-gray-400">—</span>' : ''}
-                  </td>
-                  <td class="text-sm font-bold text-gray-900 dark:text-gray-100">${esc(userName)}</td>
-                  <td class="text-xs text-gray-700 dark:text-gray-300 max-w-xs font-medium">
-                    ${ev.reason ? `<div class="font-bold text-gray-900 dark:text-gray-100">${esc(ev.reason)}</div>` : ''}
-                    ${ev.notes ? `<div class="text-gray-600 dark:text-gray-400 italic mt-0.5">"${esc(ev.notes)}"</div>` : ''}
-                    ${!ev.reason && !ev.notes ? '<span class="text-gray-400">—</span>' : ''}
+                  <td class="small strong">${esc(userName)}</td>
+                  <td class="tiny secondary">
+                    ${ev.reason ? `<div class="strong">${esc(ev.reason)}</div>` : ''}
+                    ${ev.notes ? `<div class="muted italic">"${esc(ev.notes)}"</div>` : ''}
+                    ${!ev.reason && !ev.notes ? '<span class="muted">&mdash;</span>' : ''}
                   </td>
                 </tr>
               `;
