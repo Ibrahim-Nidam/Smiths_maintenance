@@ -15,8 +15,7 @@ const NAV = [
   { href: '#/stock',     label: 'Stock',     roles: null },
   { href: '#/rma',       label: 'RMA',       roles: null },
   { href: '#/history',   label: 'History',   roles: null },
-  { href: '#/teams',     label: 'Teams',     roles: [ROLES.ADMIN, ROLES.MANAGER] },
-  { href: '#/users',     label: 'Users',     roles: [ROLES.ADMIN, ROLES.MANAGER] },
+  { href: '#/staff',     label: 'Staff',     roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { href: '#/settings',  label: 'Settings',  roles: [ROLES.ADMIN, ROLES.MANAGER] },
 ];
 

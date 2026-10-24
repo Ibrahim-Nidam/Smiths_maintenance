@@ -10,7 +10,7 @@ const QUICK_LINKS = [
   { href: '#/stock', label: 'Stock & parts inventory', roles: null },
   { href: '#/rma', label: 'RMA tags', roles: null },
   { href: '#/history', label: 'Global audit history', roles: null },
-  { href: '#/users', label: 'Users & access control', roles: [ROLES.ADMIN, ROLES.MANAGER] },
+  { href: '#/staff', label: 'Staff (users & teams)', roles: [ROLES.ADMIN, ROLES.MANAGER] },
 ];
 
 function linkRows(role) {

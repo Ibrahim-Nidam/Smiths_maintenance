@@ -1,15 +1,18 @@
 // Hash router: #/machines, #/machines/K289, #/history ...
 const routes = [
-  { path: /^\/dashboard$/,         page: 'dashboard' },
-  { path: /^\/machines$/,          page: 'machines' },
-  { path: /^\/machines\/([^/?]+)/, page: 'machine-detail', params: ['code'] },
-  { path: /^\/stock$/,             page: 'stock' },
-  { path: /^\/rma$/,               page: 'rma' },
-  { path: /^\/history$/,           page: 'history' },
-  { path: /^\/teams$/,             page: 'teams' },
-  { path: /^\/users$/,             page: 'users' },
-  { path: /^\/settings$/,          page: 'settings' },
-  { path: /^\/styleguide$/,        page: 'styleguide' },
+  { path: /^\/dashboard$/,            page: 'dashboard' },
+  { path: /^\/machines$/,             page: 'machines' },
+  { path: /^\/machines\/([^/?]+)/,    page: 'machine-detail', params: ['code'] },
+  { path: /^\/stock$/,                page: 'stock' },
+  { path: /^\/rma$/,                  page: 'rma' },
+  { path: /^\/history$/,              page: 'history' },
+  { path: /^\/staff$/,                page: 'staff', defaults: { tab: 'users' } },
+  { path: /^\/staff\/(users|teams)$/, page: 'staff', params: ['tab'] },
+  { path: /^\/people/,                page: 'staff', defaults: { tab: 'users' } },
+  { path: /^\/users$/,                page: 'staff', defaults: { tab: 'users' } },
+  { path: /^\/teams$/,                page: 'staff', defaults: { tab: 'teams' } },
+  { path: /^\/settings$/,             page: 'settings' },
+  { path: /^\/styleguide$/,           page: 'styleguide' },
 ];
 
 export function startRouter(container, ctx) {
@@ -20,9 +23,9 @@ export function startRouter(container, ctx) {
     for (const r of routes) {
       const m = hashPath.match(r.path);
       if (!m) continue;
-      const params = {};
+      const params = { ...(r.defaults || {}) };
       (r.params || []).forEach((name, i) => (params[name] = decodeURIComponent(m[i + 1])));
-      
+
       // Dynamic import with cache buster to ensure instant UI updates
       const mod = await import(`./pages/${r.page}.js?v=${Date.now()}`);
       container.innerHTML = '';
