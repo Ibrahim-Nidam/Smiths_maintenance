@@ -1,9 +1,11 @@
 import { getMachineByCode, updateMachine, deleteMachine, listMachineTypes, listTemplatePartAvailability } from '../api/machines.js';
 import { addPartToMachine, updateMachinePart, deleteMachinePart, setSlotSerial, updateSlotInstance, replaceSerializedPart, replaceNonSerializedPart, swapParts, setRmaTag } from '../api/parts.js';
+import { listAvailableUnits, findStockItemForPart } from '../api/stock.js';
 import { listMaintenanceEvents } from '../api/history.js';
 import { pageHeader, emptyState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
+import { mountPartPicker } from '../components/part-picker.js';
 import { ROLES } from '../auth.js';
 import { copyButton } from '../components/input-enhancements.js';
 
@@ -238,6 +240,7 @@ export async function render(container, params, ctx) {
           `,
           submitText: 'Add Part to Machine',
           onOpen: async (modal) => {
+            mountPartPicker(modal.querySelector('#ap-pn'), { target: modal.querySelector('#ap-name') });
             if (!isGlobal) return;
             const syncCheckbox = modal.querySelector('#ap-sync-templates');
             const typeContainer = modal.querySelector('#ap-template-types');
@@ -419,10 +422,10 @@ export async function render(container, params, ctx) {
               ${canManage ? `
                 <div class="slot-actions">
                   ${isEmpty
-                    ? `<button class="slot-action is-accent slot-fill-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-part-name="${esc(p.name)}">Add serial</button>`
+                    ? `<button class="slot-action is-accent slot-fill-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-part-name="${esc(p.name)}" data-pn="${esc(p.part_number)}">Add serial</button>`
                     : `
                       <button class="slot-action slot-edit-btn" data-inst-id="${inst.id}" data-serial="${esc(inst.serial_number)}" data-notes="${esc(inst.notes || '')}" data-pos="${s.position}" data-part-name="${esc(p.name)}">Edit markings</button>
-                      <button class="slot-action slot-replace-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}" data-part-name="${esc(p.name)}">Replace</button>
+                      <button class="slot-action slot-replace-btn" data-slot-id="${s.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}" data-part-name="${esc(p.name)}" data-pn="${esc(p.part_number)}">Replace</button>
                       <button class="slot-action ${isRma ? 'is-success' : 'is-danger'} slot-rma-btn" data-inst-id="${inst.id}" data-tagged="${isRma}">${isRma ? 'Untag RMA' : 'Tag RMA'}</button>
                       ${p.placement_mode === 'flexible' && p.quantity > 1
                         ? `<button class="slot-action slot-swap-btn" data-slot-id="${s.id}" data-part-id="${p.id}" data-pos="${s.position}" data-serial="${esc(inst.serial_number)}">Swap</button>`
@@ -483,8 +486,8 @@ export async function render(container, params, ctx) {
                         ${ev.position ? `<div class="tiny muted">Pos ${ev.position}</div>` : ''}
                       </td>
                       <td class="mono tiny break-all">
-                        ${oldSn ? `<div class="text-danger strong">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
-                        ${newSn ? `<div class="text-success strong">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
+                        ${oldSn ? `<div class="text-danger mono">- ${esc(oldSn)}${copyButton(oldSn, 'Copy serial number')}</div>` : ''}
+                        ${newSn ? `<div class="text-success mono">+ ${esc(newSn)}${copyButton(newSn, 'Copy serial number')}</div>` : ''}
                         ${!oldSn && !newSn ? '<span class="muted">&mdash;</span>' : ''}
                       </td>
                       <td class="small secondary">${esc(userName)}</td>
@@ -504,6 +507,91 @@ export async function render(container, params, ctx) {
     } catch (err) {
       container.innerHTML = alertText(`Error loading machine history: ${esc(err.message)}`);
     }
+  }
+
+  // Offers the units of this part number that are already in stock, so a position
+  // can be filled by picking a unit instead of retyping a serial number.
+  async function mountUnitPicker(box, { partNumber, targetInput, rmaCheckbox = null }) {
+    if (!box) return;
+
+    box.innerHTML = '<p class="tiny muted">Checking stock for this part number...</p>';
+
+    let units = [];
+    let stockItem = null;
+    try {
+      [units, stockItem] = await Promise.all([
+        listAvailableUnits(partNumber),
+        findStockItemForPart(partNumber),
+      ]);
+    } catch {
+      box.innerHTML = '<p class="tiny muted">Stock availability could not be loaded. You can still type a serial manually.</p>';
+      return;
+    }
+
+    const stockLine = stockItem
+      ? `From stock: <strong>${esc(stockItem.name)}</strong>${stockItem.location ? ` &middot; ${esc(stockItem.location)}` : ''}`
+      : 'No stock item is registered for this part number yet.';
+
+    if (!units.length) {
+      box.innerHTML = `
+        <div class="unit-picker-empty">
+          <p class="small secondary">No units of ${esc(partNumber)} are in stock right now.</p>
+          <p class="tiny muted mt-1">Type a serial below &mdash; a new unit will be created and tracked in stock.</p>
+          <p class="tiny muted mt-1">${stockLine}</p>
+        </div>
+      `;
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="unit-picker-head">
+        <span class="small strong">${units.length} unit${units.length === 1 ? '' : 's'} in stock</span>
+        <span class="tiny muted">${stockLine}</span>
+      </div>
+      <div class="unit-picker-list">
+        ${units.map((unit, index) => `
+          <label class="unit-option ${unit.doa ? 'is-disabled' : ''}" title="${unit.doa ? 'Marked DOA, it cannot be installed' : ''}">
+            <input type="radio" name="unit-pick" value="${index}" ${unit.doa ? 'disabled' : ''}>
+            <span class="unit-option-main">
+              <span class="row">
+                <span class="mono">${esc(unit.serial_number)}</span>
+                ${unit.rma_tagged ? '<span class="badge badge-danger">RMA</span>' : ''}
+                ${unit.doa ? '<span class="badge badge-danger">DOA</span>' : ''}
+              </span>
+              ${unit.notes ? `<span class="tiny muted">${esc(unit.notes)}</span>` : ''}
+            </span>
+            <span class="tiny muted nowrap">${esc(unit.storage_location || (stockItem ? stockItem.location : '') || 'Stock')}</span>
+          </label>
+        `).join('')}
+      </div>
+      <p class="tiny muted mt-2">Pick a unit to fill in the serial number below, or type a serial that is not in stock yet.</p>
+    `;
+
+    let autoTagged = false;
+
+    box.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const unit = units[Number(radio.value)];
+        if (!unit) return;
+        targetInput.value = unit.serial_number;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (rmaCheckbox) {
+          rmaCheckbox.checked = !!unit.rma_tagged;
+          autoTagged = !!unit.rma_tagged;
+        }
+      });
+    });
+
+    targetInput.addEventListener('input', () => {
+      const typed = targetInput.value.trim().toUpperCase();
+      const stillSelected = units.some(u => u.serial_number.toUpperCase() === typed);
+      if (stillSelected) return;
+      box.querySelectorAll('input[type="radio"]:checked').forEach(radio => { radio.checked = false; });
+      if (autoTagged && rmaCheckbox) {
+        rmaCheckbox.checked = false;
+        autoTagged = false;
+      }
+    });
   }
 
   function attachActionHandlers(container, machine, canManage, reload) {
@@ -538,10 +626,15 @@ export async function render(container, params, ctx) {
         const slotId = btn.dataset.slotId;
         const pos = btn.dataset.pos;
         const partName = btn.dataset.partName;
+        const partNumber = btn.dataset.pn;
 
         openModal({
           title: `Install serial &mdash; ${partName} (Pos ${pos})`,
           contentHtml: `
+            <div class="field">
+              <span class="label">Available units in stock</span>
+              <div class="unit-picker" id="unit-picker"></div>
+            </div>
             <div class="field">
               <label class="label" for="s-serial">Serial number *</label>
               <input class="input mono" id="s-serial" name="serial" required placeholder="e.g. SN-98124" style="text-transform:uppercase">
@@ -559,6 +652,15 @@ export async function render(container, params, ctx) {
             <p class="error-text"></p>
           `,
           submitText: 'Install serial',
+          onOpen: async (modal) => {
+            const serialInput = modal.querySelector('#s-serial');
+            serialInput.focus();
+            await mountUnitPicker(modal.querySelector('#unit-picker'), {
+              partNumber,
+              targetInput: serialInput,
+              rmaCheckbox: modal.querySelector('#s-rma'),
+            });
+          },
           onSubmit: async (form, close) => {
             const serial = form.serial.value;
             const rma = form.rma.checked;
@@ -612,6 +714,7 @@ export async function render(container, params, ctx) {
         const pos = btn.dataset.pos;
         const currentSerial = btn.dataset.serial;
         const partName = btn.dataset.partName;
+        const partNumber = btn.dataset.pn;
 
         openModal({
           title: `Replace ${partName} (Pos ${pos} - ${currentSerial})`,
@@ -635,6 +738,11 @@ export async function render(container, params, ctx) {
             </div>
 
             <div class="field">
+              <span class="label">Available units in stock</span>
+              <div class="unit-picker" id="unit-picker"></div>
+            </div>
+
+            <div class="field">
               <label class="label" for="s-new-serial">Replacement serial number</label>
               <input class="input mono" id="s-new-serial" name="newSerial" placeholder="Leave empty if the position stays vacant" style="text-transform:uppercase">
             </div>
@@ -651,6 +759,12 @@ export async function render(container, params, ctx) {
             <p class="error-text"></p>
           `,
           submitText: 'Confirm replacement',
+          onOpen: async (modal) => {
+            await mountUnitPicker(modal.querySelector('#unit-picker'), {
+              partNumber,
+              targetInput: modal.querySelector('#s-new-serial'),
+            });
+          },
           onSubmit: async (form, close) => {
             const outcome = form.querySelector('input[name="outcome"]:checked').value;
             const newSerial = form.newSerial.value;
@@ -838,6 +952,7 @@ export async function render(container, params, ctx) {
       `,
       submitText: 'Save part',
       onOpen: modal => {
+        mountPartPicker(modal.querySelector('#mp-pn'), { target: modal.querySelector('#mp-name') });
         const sync = modal.querySelector('#mp-sync');
         const list = modal.querySelector('#mp-template-list');
         if (sync) sync.addEventListener('change', () => list.classList.toggle('hidden', !sync.checked));

@@ -96,6 +96,58 @@ export async function render(container) {
       </div>
     </div>
 
+    <h2 class="section-title">Pickers</h2>
+    <div class="grid-1-1 mb-8">
+      <div class="panel">
+        <div class="panel-head"><h3 class="panel-title">Part number autocomplete</h3></div>
+        <div class="stack-sm">
+          <div class="picker-wrap">
+            <input class="input mono" value="604620" readonly aria-label="Part number sample">
+            <div class="picker-menu">
+              <div class="picker-item is-active" role="option" aria-selected="true"><span class="picker-pn mono">604620-6</span><span class="picker-designation">PCB ASSEMBLY HVIC-3 W/FIRMWARE</span></div>
+              <div class="picker-item" role="option" aria-selected="false"><span class="picker-pn mono">604620-7</span><span class="picker-designation">PWA, SDSII/HVICII-2, CTX9400</span></div>
+              <div class="picker-item" role="option" aria-selected="false"><span class="picker-pn mono">604620-9</span><span class="picker-designation">ASSY,(UPS,6000 VA,400 VAC,3-PHASE,220 V)</span></div>
+            </div>
+          </div>
+          <p class="hint">Typing a part number anywhere in a form suggests catalogue matches and fills the designation.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3 class="panel-title">Units available in stock</h3></div>
+        <div class="unit-picker">
+          <div class="unit-picker-head">
+            <span class="small strong">3 units in stock</span>
+            <span class="tiny muted">From stock: HVIC PCB assembly &middot; Shelf B3</span>
+          </div>
+          <div class="unit-picker-list">
+            <label class="unit-option">
+              <input type="radio" name="sg-unit" checked>
+              <span class="unit-option-main">
+                <span class="row"><span class="mono">SN-004812</span></span>
+                <span class="tiny muted">Marked with green dot</span>
+              </span>
+              <span class="tiny muted nowrap">Shelf B3</span>
+            </label>
+            <label class="unit-option">
+              <input type="radio" name="sg-unit">
+              <span class="unit-option-main">
+                <span class="row"><span class="mono">SN-004755</span><span class="badge badge-danger">RMA</span></span>
+              </span>
+              <span class="tiny muted nowrap">Shelf B3</span>
+            </label>
+            <label class="unit-option is-disabled">
+              <input type="radio" name="sg-unit" disabled>
+              <span class="unit-option-main">
+                <span class="row"><span class="mono">SN-004690</span><span class="badge badge-danger">DOA</span></span>
+              </span>
+              <span class="tiny muted nowrap">Quarantine</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <h2 class="section-title">Form</h2>
     <div class="panel" style="max-width:520px">
       <div class="field"><label class="label" for="sg-sn">Serial number</label><input class="input mono" id="sg-sn" value="SN-004812"><span class="hint">Printed on the sticker next to the part number.</span></div>

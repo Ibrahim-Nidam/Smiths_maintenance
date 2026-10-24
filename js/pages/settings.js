@@ -8,6 +8,7 @@ import {
 } from '../api/machines.js';
 import { pageHeader, emptyState, loadingState, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
+import { mountPartPicker } from '../components/part-picker.js';
 import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
@@ -19,7 +20,11 @@ export async function render(container, params, ctx) {
     return;
   }
 
-  container.innerHTML = pageHeader('Settings', 'Manage machine types and template definitions for new machines.') + `
+  container.innerHTML = pageHeader(
+    'Settings',
+    'Manage machine types and template definitions for new machines.',
+    `<a href="#/parts" class="btn btn-secondary btn-sm">Browse parts catalogue</a>`
+  ) + `
     <div class="grid-3-1">
       <div class="panel">
         <div class="panel-head">
@@ -253,6 +258,9 @@ export async function render(container, params, ctx) {
         <p class="error-text"></p>
       `,
       submitText: 'Add part',
+      onOpen: modal => {
+        mountPartPicker(modal.querySelector('#p-pn'), { target: modal.querySelector('#p-name') });
+      },
       onSubmit: async (form, close) => {
         await createTypeTemplate({
           machineTypeId: selectedTypeId,
@@ -314,6 +322,9 @@ export async function render(container, params, ctx) {
         <p class="error-text"></p>
       `,
       submitText: 'Save template part',
+      onOpen: modal => {
+        mountPartPicker(modal.querySelector('#p-pn'), { target: modal.querySelector('#p-name') });
+      },
       onSubmit: async (form, close) => {
         await updateTypeTemplate(p.id, {
           name: form.name.value,

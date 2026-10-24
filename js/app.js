@@ -13,6 +13,7 @@ const NAV = [
   { href: '#/dashboard', label: 'Dashboard', roles: null },
   { href: '#/machines',  label: 'Machines',  roles: null },
   { href: '#/stock',     label: 'Stock',     roles: null },
+  { href: '#/parts',     label: 'Parts',     roles: null },
   { href: '#/rma',       label: 'RMA',       roles: null },
   { href: '#/history',   label: 'History',   roles: null },
   { href: '#/staff',     label: 'Staff',     roles: [ROLES.ADMIN, ROLES.MANAGER] },

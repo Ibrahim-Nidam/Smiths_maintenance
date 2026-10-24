@@ -4,6 +4,7 @@ const routes = [
   { path: /^\/machines$/,             page: 'machines' },
   { path: /^\/machines\/([^/?]+)/,    page: 'machine-detail', params: ['code'] },
   { path: /^\/stock$/,                page: 'stock' },
+  { path: /^\/parts$/,                page: 'parts' },
   { path: /^\/rma$/,                  page: 'rma' },
   { path: /^\/history$/,              page: 'history' },
   { path: /^\/staff$/,                page: 'staff', defaults: { tab: 'users' } },

@@ -118,6 +118,37 @@ export async function addSerializedUnitToStock({ partNumber, serialNumber, notes
   return data;
 }
 
+// Units of one part number that are sitting in stock (available, not installed).
+// Used to offer existing serials when filling a position on a machine.
+export async function listAvailableUnits(partNumber) {
+  const pn = String(partNumber || '').trim();
+  if (!pn) return [];
+  const { data, error } = await supabase
+    .from('part_instances')
+    .select('id, part_number, serial_number, status, location, storage_location, rma_tagged, doa, notes, created_at')
+    .eq('part_number', pn)
+    .eq('active', true)
+    .eq('status', 'available')
+    .eq('location', 'stock')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// The stock record a part number belongs to, so a unit can show which stock it comes from.
+export async function findStockItemForPart(partNumber) {
+  const pn = String(partNumber || '').trim();
+  if (!pn) return null;
+  const { data, error } = await supabase
+    .from('stock_items')
+    .select('id, name, part_number, unit, location, quantity')
+    .eq('part_number', pn)
+    .eq('active', true)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function listStockMovements() {
   const { data, error } = await supabase
     .from('stock_movements')
