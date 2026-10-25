@@ -6,6 +6,7 @@ import { pageHeader, emptyState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { mountPartPicker } from '../components/part-picker.js';
+import { scanButton, mountScanButtons } from '../components/scanner.js';
 import { ROLES } from '../auth.js';
 import { copyButton } from '../components/input-enhancements.js';
 
@@ -637,7 +638,14 @@ export async function render(container, params, ctx) {
             </div>
             <div class="field">
               <label class="label" for="s-serial">Serial number *</label>
-              <input class="input mono" id="s-serial" name="serial" required placeholder="e.g. SN-98124" style="text-transform:uppercase">
+              <div class="input-row">
+                <input class="input mono" id="s-serial" name="serial" required placeholder="e.g. SN-98124" style="text-transform:uppercase">
+                ${scanButton({
+                  target: 's-serial',
+                  title: 'Serial number to install',
+                  label: 'Scan the serial number with the camera',
+                })}
+              </div>
             </div>
             <div class="field">
               <label class="checkbox-row" for="s-rma">
@@ -655,6 +663,7 @@ export async function render(container, params, ctx) {
           onOpen: async (modal) => {
             const serialInput = modal.querySelector('#s-serial');
             serialInput.focus();
+            mountScanButtons(modal);
             await mountUnitPicker(modal.querySelector('#unit-picker'), {
               partNumber,
               targetInput: serialInput,
@@ -687,7 +696,14 @@ export async function render(container, params, ctx) {
           contentHtml: `
             <div class="field">
               <label class="label" for="eu-serial">Serial number *</label>
-              <input class="input mono" id="eu-serial" name="serialNumber" required value="${esc(serial)}" style="text-transform:uppercase">
+              <div class="input-row">
+                <input class="input mono" id="eu-serial" name="serialNumber" required value="${esc(serial)}" style="text-transform:uppercase">
+                ${scanButton({
+                  target: 'eu-serial',
+                  title: 'Serial number',
+                  label: 'Scan the serial number with the camera',
+                })}
+              </div>
             </div>
             <div class="field">
               <label class="label" for="eu-notes">Technician markings / observations / comments</label>
@@ -696,6 +712,9 @@ export async function render(container, params, ctx) {
             <p class="error-text"></p>
           `,
           submitText: 'Save markings',
+          onOpen: modal => {
+            mountScanButtons(modal);
+          },
           onSubmit: async (form, close) => {
             const serialNumber = form.serialNumber.value;
             const notes = form.notes.value;

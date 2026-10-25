@@ -22,7 +22,12 @@ export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitT
   document.body.appendChild(backdrop);
 
   const onKeydown = (e) => {
-    if (e.key === 'Escape') close();
+    if (e.key !== 'Escape') return;
+    // Only the dialog on top reacts, so closing a scanner never closes the
+    // form that opened it.
+    const open = document.querySelectorAll('.modal-backdrop');
+    if (open[open.length - 1] !== backdrop) return;
+    close();
   };
 
   const close = () => {
@@ -54,8 +59,9 @@ export function openModal({ title, contentHtml, onSubmit, onOpen = null, submitT
     }
   });
 
-  // Focus first input
-  const firstInput = form.querySelector('input, select, textarea');
+  // Focus the first field, or the first button when the dialog has none, so
+  // the keyboard lands inside the dialog instead of on the page behind it.
+  const firstInput = form.querySelector('input, select, textarea, button');
   if (firstInput) firstInput.focus();
 
   if (onOpen) {

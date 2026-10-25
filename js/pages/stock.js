@@ -16,6 +16,7 @@ import { fetchCatalog } from '../api/catalog.js';
 import { pageHeader, emptyState, loadingState, alertText, esc } from '../components/ui.js';
 import { openModal } from '../components/modal.js';
 import { mountPartPicker } from '../components/part-picker.js';
+import { scanButton, mountScanButtons } from '../components/scanner.js';
 import { copyButton } from '../components/input-enhancements.js';
 import { toast } from '../components/toast.js';
 import { ROLES } from '../auth.js';
@@ -358,7 +359,14 @@ export async function render(container, params, ctx) {
       contentHtml: `
         <div class="field">
           <label class="label" for="unit-serial">Serial number *</label>
-          <input class="input mono" id="unit-serial" name="serial" value="${unit.serial}" required>
+          <div class="input-row">
+            <input class="input mono" id="unit-serial" name="serial" value="${unit.serial}" required>
+            ${scanButton({
+              target: 'unit-serial',
+              title: `Serial number ${unit.serial}`,
+              label: 'Scan the serial number with the camera',
+            })}
+          </div>
         </div>
         <div class="field">
           <label class="label" for="unit-notes">Notes</label>
@@ -366,6 +374,9 @@ export async function render(container, params, ctx) {
         </div>
         <p class="error-text"></p>
       `,
+      onOpen: modal => {
+        mountScanButtons(modal);
+      },
       onSubmit: async (form, close) => {
         await updateSlotInstance({
           instanceId: unit.id,
@@ -543,6 +554,7 @@ export async function render(container, params, ctx) {
       submitText: 'Add to stock',
       onOpen: modal => {
         wireStockForm(modal);
+        mountScanButtons(modal);
         mountPartPicker(modal.querySelector('#st-pn'), { target: modal.querySelector('#st-name') });
         mountPartPicker(modal.querySelector('#st-ser-pn'));
       },
@@ -645,12 +657,18 @@ export async function render(container, params, ctx) {
           const rows = [];
           for (let i = 0; i < capped; i++) {
             rows.push(`
-              <label class="serial-row" for="st-serial-${i}">
+              <div class="serial-row">
                 <span class="serial-row-index" aria-hidden="true">${i + 1}</span>
                 <input class="input mono" id="st-serial-${i}" name="serSerialNumber"
+                  aria-label="Serial number ${i + 1}"
                   placeholder="SN-${88000 + i}" style="text-transform:uppercase"
                   autocomplete="off" ${serializedVisible ? 'required' : ''}>
-              </label>
+                ${scanButton({
+                  target: `st-serial-${i}`,
+                  title: `Serial number ${i + 1}`,
+                  label: `Scan serial number ${i + 1} with the camera`,
+                })}
+              </div>
             `);
           }
           serialList.innerHTML = rows.join('');

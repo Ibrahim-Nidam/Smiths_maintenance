@@ -1,4 +1,5 @@
 import { pageHeader } from '../components/ui.js';
+import { scanButton, mountScanButtons } from '../components/scanner.js';
 
 // Visual reference for the design system. Open at #/styleguide. Not linked in the menu.
 export async function render(container) {
@@ -150,10 +151,18 @@ export async function render(container) {
 
     <h2 class="section-title">Form</h2>
     <div class="panel" style="max-width:520px">
-      <div class="field"><label class="label" for="sg-sn">Serial number</label><input class="input mono" id="sg-sn" value="SN-004812"><span class="hint">Printed on the sticker next to the part number.</span></div>
+      <div class="field"><label class="label" for="sg-sn">Serial number</label>
+        <div class="input-row">
+          <input class="input mono" id="sg-sn" value="SN-004812" aria-label="Serial number sample">
+          ${scanButton({ target: 'sg-sn', title: 'Serial number', label: 'Scan the serial number with the camera' })}
+        </div>
+        <span class="hint">Printed on the sticker next to the part number. The button reads it from the camera.</span>
+      </div>
       <div class="field"><label class="label" for="sg-out">Removed unit</label><select class="select" id="sg-out"><option>Damaged, declare RMA</option><option>Working, return to stock</option><option>Scrapped</option></select></div>
       <div class="field"><label class="label" for="sg-n">Notes</label><textarea class="textarea" id="sg-n"></textarea></div>
       <div class="field"><label class="checkbox-row" for="sg-rma"><input type="checkbox" id="sg-rma" checked><span class="label">RMA applicable</span></label></div>
       <button class="btn btn-primary">Save changes</button>
     </div>`;
+
+  mountScanButtons(container);
 }

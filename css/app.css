@@ -522,7 +522,6 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   gap: 9px;
-  cursor: text;
 }
 .serial-row .input { flex: 1 1 auto; min-width: 0; }
 
@@ -538,6 +537,42 @@ input[type="radio"] {
   background: var(--surface-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+/* Field with an icon button next to it (barcode scan) */
+.input-row { display: flex; align-items: center; gap: 8px; }
+.input-row .input { flex: 1 1 auto; min-width: 0; }
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  padding: 0;
+}
+.icon-btn svg { display: block; }
+
+/* ---------------------------------------------- Camera barcode scanner */
+.scanner {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius);
+}
+
+.scanner-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanner-frame {
+  position: absolute;
+  inset: 12% 8%;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.45);
+  pointer-events: none;
 }
 
 /* Expandable rows: team members under a team, units under a part number */
@@ -1531,6 +1566,7 @@ input[type="radio"] {
 
   .btn { height: 42px; }
   .btn-sm { height: 36px; }
+  .icon-btn { width: 36px; }
 }
 
 @media (max-width: 420px) {
