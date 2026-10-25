@@ -39,10 +39,11 @@ added by `sql/012_login_and_accounts.sql`; until that file is run, only email ad
   toast lists what was added and what was not.
 - Every serialized unit row has **Tag RMA** / **Untag RMA** next to *Mark DOA*. Tagging puts the
   unit on the **RMA Defective Units** page (`#/rma`) and writes a history entry.
-- Every serial number field has a barcode button: it opens the camera
-  (`js/components/scanner.js`, native `BarcodeDetector`, no library), reads one code, fills the
-  field and closes. On browsers without camera detection it says so and the field stays usable
-  by hand or with a handheld scanner.
+- Every serial number field has a barcode button (`js/components/scanner.js`):
+  on mobile phones it opens the phone's native camera directly for sharp autofocus
+  barcode capture; on laptops and desktops it opens the live webcam scanner with multi-camera
+  switching and photo upload fallback. Works across all modern browsers (Firefox, Chrome,
+  Safari, Edge) using native `BarcodeDetector` with self-contained client-side `ZXing` fallback.
 - Modals are bottom sheets below 640px: full-height with safe-area padding, scrollable body and
   buttons that stretch across the width.
 

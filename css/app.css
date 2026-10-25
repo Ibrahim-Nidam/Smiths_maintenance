@@ -458,6 +458,14 @@ code {
   background-repeat: no-repeat;
 }
 
+.select-sm {
+  height: 28px;
+  padding: 0 24px 0 8px;
+  font-size: 12px;
+  background-position: calc(100% - 13px) 11px, calc(100% - 9px) 11px;
+  background-size: 4px 4px, 4px 4px;
+}
+
 .checkbox-row {
   display: flex;
   align-items: flex-start;
